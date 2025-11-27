@@ -1,0 +1,28 @@
+# VCS
+.git
+.gitattributes
+.gitignore
+
+# IDE
+.idea
+*.iml
+
+# Gradle / 빌드 산출물
+.gradle
+build/
+!build/libs/
+!build/libs/*.jar
+out/
+
+# 로그/잡파일
+*.log
+.DS_Store
+Thumbs.db
+
+# 비밀/환경파일(이미지에 넣지 말자!)
+.env
+**/.env
+**/application-*.yml
+**/application-*.properties
+*.pem
+*.key

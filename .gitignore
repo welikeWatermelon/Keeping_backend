@@ -1,0 +1,64 @@
+HELP.md
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+**/backend/src/docs/
+
+### VS Code ###
+.vscode/
+
+
+### yml ###
+src/main/resources/**.yml
+
+### generated ###
+src/main/generated/
+
+.DS_Store
+/src/docs/card_payment.md
+/src/docs/card_canceled.md
+/src/docs/notification.md
+/src/docs/notification_kafka.md
+/src/docs/notification_nothing.md
+/src/docs/notification_redis.md
+/src/CLAUD.md
+/src/data_erd.md
+/src/main/resources/firebase/**.json
+/src/main/resources/**.json
+
+
+### firebase
+/resources/firebase/keeping-firebase-adminsdk.json
+src/resources/keeping-firebase-adminsdk.json
+src/resources/firebase/keeping-firebase-adminsdk.json
+src/resources/application.yml

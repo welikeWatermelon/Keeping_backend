@@ -70,21 +70,5 @@ sms:
   send-number: "01000000000"
   base-url: https://api.coolsms.co.kr
 
-finopenapi:
-  base-url: https://finopenapi.ssafy.io
-  api-key: test
-  time-out-ms:
-    connect: 1000
-    read: 1000
-
-ssafy:
-  finance:
-    api:
-      base-url: https://finopenapi.ssafy.io
-      key: test
-      timeout-ms:
-        connect: 1000
-        read: 1000
-
 jwt:
   secret: testtesttesttesttesttesttesttest

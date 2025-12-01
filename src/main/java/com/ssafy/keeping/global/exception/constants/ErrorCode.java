@@ -34,6 +34,11 @@ public enum ErrorCode {
     INVALID_CARD_NUMBER(HttpStatus.BAD_REQUEST, "입력하신 카드번호가 올바르지 않습니다."),
     INVALID_CVC(HttpStatus.BAD_REQUEST, "CVC 번호가 올바르지 않습니다."),
 
+    // 결제 게이트웨이 관련
+    PAYMENT_CONFIRM_FAILED(HttpStatus.BAD_REQUEST, "결제 승인에 실패했습니다."),
+    PAYMENT_CANCEL_FAILED(HttpStatus.BAD_REQUEST, "결제 취소에 실패했습니다."),
+    UNSUPPORTED_PAYMENT_PROVIDER(HttpStatus.BAD_REQUEST, "지원하지 않는 결제 제공자입니다."),
+
     // 취소 관련
     TRANSACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 거래를 찾을 수 없습니다."),
     SETTLEMENT_TASK_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 정산 작업을 찾을 수 없습니다."),

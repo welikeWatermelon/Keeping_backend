@@ -3,9 +3,12 @@ package com.ssafy.keeping.domain.charge.service;
 import com.ssafy.keeping.domain.charge.dto.request.CancelRequestDto;
 import com.ssafy.keeping.domain.charge.dto.response.CancelListResponseDto;
 import com.ssafy.keeping.domain.charge.dto.response.CancelResponseDto;
-import com.ssafy.keeping.domain.charge.dto.ssafyapi.response.SsafyCardCancelResponseDto;
 import com.ssafy.keeping.domain.charge.model.SettlementTask;
 import com.ssafy.keeping.domain.charge.repository.SettlementTaskRepository;
+import com.ssafy.keeping.domain.payment.gateway.PaymentGateway;
+import com.ssafy.keeping.domain.payment.gateway.PaymentGatewayFactory;
+import com.ssafy.keeping.domain.payment.gateway.dto.CancelRequest;
+import com.ssafy.keeping.domain.payment.gateway.dto.CancelResult;
 import com.ssafy.keeping.domain.payment.transactions.constant.TransactionType;
 import com.ssafy.keeping.domain.payment.transactions.model.Transaction;
 import com.ssafy.keeping.domain.payment.transactions.repository.TransactionRepository;
@@ -15,8 +18,6 @@ import com.ssafy.keeping.domain.wallet.repository.WalletStoreBalanceRepository;
 import com.ssafy.keeping.domain.wallet.repository.WalletStoreLotRepository;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
-import com.ssafy.keeping.domain.event.service.KafkaEventProducer;
-import com.ssafy.keeping.domain.event.dto.CancelEvent;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -39,8 +40,7 @@ public class CancelService {
     private final TransactionRepository transactionRepository;
     private final WalletStoreLotRepository walletStoreLotRepository;
     private final WalletStoreBalanceRepository walletStoreBalanceRepository;
-    private final SsafyFinanceApiService ssafyFinanceApiService;
-    private final KafkaEventProducer kafkaEventProducer;
+    private final PaymentGatewayFactory paymentGatewayFactory;
 
     /**
      * 취소 가능한 거래 목록 조회 (페이지네이션)
@@ -66,40 +66,68 @@ public class CancelService {
      */
     @Transactional
     public CancelResponseDto cancelPayment(Long customerId, CancelRequestDto requestDto) {
-        log.info("카드 결제 취소 처리 시작 - 고객ID: {}, 거래번호: {}", customerId, requestDto.getTransactionUniqueNo());
+        // paymentKey 확인 (요청에서 직접 받거나 transactionUniqueNo로 조회)
+        String paymentKey = resolvePaymentKey(requestDto);
 
-        // 1. 취소 가능 검증
-        Transaction originalTransaction = validateCancellation(requestDto.getTransactionUniqueNo());
-        
+        log.info("결제 취소 처리 시작 - 고객ID: {}, paymentKey: {}", customerId, paymentKey);
+
+        // 1. 취소 가능 검증 (paymentKey는 transactionUniqueNo에 저장되어 있음)
+        Transaction originalTransaction = validateCancellation(paymentKey);
+
         // 2. 권한 검증 (본인의 거래인지 확인)
         if (!originalTransaction.getCustomer().getCustomerId().equals(customerId)) {
             throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         }
-        
-        // 3. 고객 정보 조회 (userKey 필요)
-        Customer customer = originalTransaction.getCustomer();
-        String userKey = customer.getUserKey();
-        
-        if (userKey == null || userKey.trim().isEmpty()) {
-            throw new CustomException(ErrorCode.USER_KEY_NOT_FOUND);
+
+        // 3. SettlementTask에서 실제 결제 금액 조회
+        SettlementTask settlementTask = settlementTaskRepository
+                .findByTransaction(originalTransaction)
+                .orElseThrow(() -> new CustomException(ErrorCode.SETTLEMENT_TASK_NOT_FOUND));
+
+        // 4. 결제 게이트웨이를 통한 결제 취소
+        PaymentGateway gateway = paymentGatewayFactory.getDefaultGateway();
+
+        CancelRequest cancelRequest = CancelRequest.builder()
+                .paymentKey(paymentKey)
+                .cancelReason(requestDto.getCancelReason())
+                .cancelAmount(requestDto.getCancelAmount() != null
+                        ? requestDto.getCancelAmount()
+                        : settlementTask.getActualPaymentAmount())
+                .build();
+
+        log.info("결제 게이트웨이 취소 호출 - paymentKey: {}, cancelAmount: {}",
+                paymentKey, cancelRequest.getCancelAmount());
+
+        CancelResult cancelResult = gateway.cancelPayment(cancelRequest);
+
+        if (!cancelResult.isSuccess()) {
+            log.error("결제 취소 실패 - errorCode: {}, message: {}",
+                    cancelResult.getErrorCode(), cancelResult.getErrorMessage());
+            throw new CustomException(ErrorCode.PAYMENT_CANCEL_FAILED);
         }
-        
-        // 3. 외부 API 호출 (실제 취소 처리)
-        log.info("외부 API 취소 호출 시작 - 거래번호: {}, userKey: {}", 
-                requestDto.getTransactionUniqueNo(), userKey);
-        
-        SsafyCardCancelResponseDto apiResponse = ssafyFinanceApiService.requestCardCancel(
-                userKey,
-                requestDto.getCardNo(),
-                requestDto.getCvc(),
-                requestDto.getTransactionUniqueNo()
-        );
-        
-        log.info("외부 API 취소 성공 - 취소 거래번호: {}", 
-                apiResponse.getRec().getTransactionUniqueNo());
-        
-        // 4. DB 반영 (외부 API 성공 후)
-        return updateDatabaseAfterCancel(originalTransaction, apiResponse);
+
+        log.info("결제 취소 성공 - paymentKey: {}, cancelAmount: {}",
+                cancelResult.getPaymentKey(), cancelResult.getCancelAmount());
+
+        // 5. DB 반영
+        return updateDatabaseAfterCancel(originalTransaction, cancelResult);
+    }
+
+    /**
+     * paymentKey 확인 (요청에서 직접 받거나 transactionUniqueNo로 조회)
+     */
+    private String resolvePaymentKey(CancelRequestDto requestDto) {
+        // paymentKey가 직접 제공된 경우
+        if (requestDto.getPaymentKey() != null && !requestDto.getPaymentKey().isBlank()) {
+            return requestDto.getPaymentKey();
+        }
+
+        // transactionUniqueNo로 조회하는 경우 (하위 호환성)
+        if (requestDto.getTransactionUniqueNo() != null && !requestDto.getTransactionUniqueNo().isBlank()) {
+            return requestDto.getTransactionUniqueNo();
+        }
+
+        throw new CustomException(ErrorCode.INVALID_REQUEST);
     }
 
     /**
@@ -142,16 +170,16 @@ public class CancelService {
      * 취소 성공 후 DB 업데이트
      */
     private CancelResponseDto updateDatabaseAfterCancel(
-            Transaction originalTransaction, 
-            SsafyCardCancelResponseDto apiResponse) {
-        
+            Transaction originalTransaction,
+            CancelResult cancelResult) {
+
         log.info("DB 반영 로직 시작 - 원본 거래ID: {}", originalTransaction.getTransactionId());
 
         // 1. settlement_tasks 상태를 CANCELED로 변경
         SettlementTask settlementTask = settlementTaskRepository
                 .findByTransaction(originalTransaction)
                 .orElseThrow(() -> new CustomException(ErrorCode.SETTLEMENT_TASK_NOT_FOUND));
-        
+
         settlementTask.markAsCanceled();
         log.info("SettlementTask 상태 CANCELED로 변경 완료");
 
@@ -189,31 +217,10 @@ public class CancelService {
         log.info("WalletStoreBalance 차감 완료 - 차감 금액: {}, 잔여 잔액: {}",
                 originalTransaction.getAmount(), balance.getBalance());
 
-        // 5. 카드 결제 취소 완료 이벤트 발행
-        try {
-            CancelEvent cancelEvent = CancelEvent.builder()
-                    .customerId(originalTransaction.getCustomer().getCustomerId())
-                    .customerName(originalTransaction.getCustomer().getName())
-                    .storeId(originalTransaction.getStore().getStoreId())
-                    .storeName(originalTransaction.getStore().getStoreName())
-                    .ownerId(originalTransaction.getStore().getOwner().getOwnerId())
-                    .cancelTransactionId(cancelTransaction.getTransactionId())
-                    .transactionUniqueNo(originalTransaction.getTransactionUniqueNo())
-                    .cancelAmount(settlementTask.getActualPaymentAmount())
-                    .cancelTime(LocalDateTime.now())
-                    .build();
+        log.info("카드 취소 완료 - 고객ID: {}, 취소금액: {}",
+                originalTransaction.getCustomer().getCustomerId(), settlementTask.getActualPaymentAmount());
 
-            kafkaEventProducer.publishCancelEvent(cancelEvent);
-
-            log.info("카드 취소 이벤트 발행 완료 - 고객ID: {}, 취소금액: {}",
-                    originalTransaction.getCustomer().getCustomerId(), settlementTask.getActualPaymentAmount());
-        } catch (Exception e) {
-            log.warn("카드 취소 이벤트 발행 실패 - 고객ID: {}, 오류: {}",
-                    originalTransaction.getCustomer().getCustomerId(), e.getMessage());
-            // 이벤트 발행 실패는 비즈니스 로직에 영향을 주지 않음
-        }
-
-        // 6. 응답 생성 (실제 결제금액과 포인트 구분)
+        // 5. 응답 생성 (실제 결제금액과 포인트 구분)
         return CancelResponseDto.builder()
                 .cancelTransactionId(cancelTransaction.getTransactionId())
                 .transactionUniqueNo(originalTransaction.getTransactionUniqueNo())

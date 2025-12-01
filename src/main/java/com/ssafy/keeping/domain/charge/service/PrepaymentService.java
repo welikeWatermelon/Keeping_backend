@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.keeping.domain.charge.canonical.CanonicalPrepayment;
 import com.ssafy.keeping.domain.charge.dto.request.PrepaymentRequestDto;
 import com.ssafy.keeping.domain.charge.dto.response.PrepaymentResponseDto;
-import com.ssafy.keeping.domain.charge.dto.ssafyapi.response.SsafyCardPaymentResponseDto;
 import com.ssafy.keeping.domain.charge.model.ChargeBonus;
 import com.ssafy.keeping.domain.charge.service.ChargeBonusService;
 import com.ssafy.keeping.domain.idempotency.constant.IdemActorType;
@@ -19,6 +18,8 @@ import com.ssafy.keeping.domain.charge.model.SettlementTask;
 import com.ssafy.keeping.domain.charge.repository.SettlementTaskRepository;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
+import com.ssafy.keeping.domain.user.owner.model.Owner;
+import com.ssafy.keeping.domain.user.owner.repository.OwnerRepository;
 import com.ssafy.keeping.domain.payment.transactions.constant.TransactionType;
 import com.ssafy.keeping.domain.store.model.Store;
 import com.ssafy.keeping.domain.store.repository.StoreRepository;
@@ -33,8 +34,10 @@ import com.ssafy.keeping.domain.wallet.model.WalletStoreLot;
 import com.ssafy.keeping.domain.wallet.repository.WalletRepository;
 import com.ssafy.keeping.domain.wallet.repository.WalletStoreBalanceRepository;
 import com.ssafy.keeping.domain.wallet.repository.WalletStoreLotRepository;
-import com.ssafy.keeping.domain.event.service.KafkaEventProducer;
-import com.ssafy.keeping.domain.event.dto.PaymentEvent;
+import com.ssafy.keeping.domain.payment.gateway.PaymentGateway;
+import com.ssafy.keeping.domain.payment.gateway.PaymentGatewayFactory;
+import com.ssafy.keeping.domain.payment.gateway.dto.PaymentRequest;
+import com.ssafy.keeping.domain.payment.gateway.dto.PaymentResult;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -44,11 +47,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -57,7 +57,7 @@ import java.util.UUID;
 @Transactional
 public class PrepaymentService {
 
-    private final SsafyFinanceApiService ssafyFinanceApiService;
+    private final PaymentGatewayFactory paymentGatewayFactory;
     private final CustomerRepository customerRepository;
     private final StoreRepository storeRepository;
     private final WalletRepository walletRepository;
@@ -65,8 +65,8 @@ public class PrepaymentService {
     private final WalletStoreLotRepository walletStoreLotRepository;
     private final WalletStoreBalanceRepository walletStoreBalanceRepository;
     private final SettlementTaskRepository settlementTaskRepository;
-    private final KafkaEventProducer kafkaEventProducer;
     private final ChargeBonusService chargeBonusService;
+    private final OwnerRepository ownerRepository;
 
     private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final IdempotencyService idempotencyService;
@@ -131,32 +131,35 @@ public class PrepaymentService {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CUSTOMER_NOT_FOUND));
 
-        String userKey = customer.getUserKey();
-
-        if (userKey == null || userKey.trim().isEmpty()) {
-            throw new CustomException(ErrorCode.USER_KEY_NOT_FOUND);
-        }
-
         // 2. 가게 정보 조회 및 검증
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STORE_NOT_FOUND));
 
-        String merchantId = String.valueOf(store.getMerchantId());
-
         // 3. 사용자의 개인 지갑 조회 또는 생성
         Wallet wallet = findOrCreateIndividualWallet(customer);
 
-        // 4. 외부 API 호출 (카드 결제) - CustomException이 자동으로 던져짐
-        SsafyCardPaymentResponseDto apiResponse = ssafyFinanceApiService.requestCardPayment(
-                userKey,
-                requestDto.getCardNo(),
-                requestDto.getCvc(),
-                merchantId,
-                requestDto.getPaymentBalance()
-        );
+        // 4. 결제 게이트웨이를 통한 결제 승인
+        PaymentGateway gateway = paymentGatewayFactory.getDefaultGateway();
+
+        PaymentRequest paymentRequest = PaymentRequest.builder()
+                .paymentKey(requestDto.getPaymentKey())
+                .orderId(requestDto.getOrderId())
+                .amount(requestDto.getAmount())
+                .storeId(storeId)
+                .customerId(customerId)
+                .customerName(customer.getName())
+                .build();
+
+        PaymentResult paymentResult = gateway.processPayment(paymentRequest);
+
+        if (!paymentResult.isSuccess()) {
+            log.error("결제 승인 실패 - errorCode: {}, message: {}",
+                    paymentResult.getErrorCode(), paymentResult.getErrorMessage());
+            throw new CustomException(ErrorCode.PAYMENT_CONFIRM_FAILED);
+        }
 
         // 5. 보너스 포인트 계산
-        long actualPaymentAmount = requestDto.getPaymentBalance();
+        long actualPaymentAmount = requestDto.getAmount();
         ChargeBonus chargeBonus = chargeBonusService.findChargeBonusByAmount(storeId, actualPaymentAmount).orElse(null);
 
         long totalPoints = actualPaymentAmount;
@@ -172,7 +175,7 @@ public class PrepaymentService {
         }
 
         // 6. DB 업데이트 (트랜잭션 처리)
-        PrepaymentResponseDto response = updateDatabaseAfterPayment(wallet, store, actualPaymentAmount, totalPoints, bonusPercentage, bonusAmount, apiResponse);
+        PrepaymentResponseDto response = updateDatabaseAfterPayment(wallet, store, actualPaymentAmount, totalPoints, bonusPercentage, bonusAmount, paymentResult);
 
         // 멱등 완료 기록(DONE + 응답 스냅샷)
         idempotencyService.completeCharge(slot, HttpStatus.CREATED.value(), response);
@@ -204,16 +207,17 @@ public class PrepaymentService {
             long totalPoints,
             int bonusPercentage,
             long bonusAmount,
-            SsafyCardPaymentResponseDto apiResponse) {
+            PaymentResult paymentResult) {
 
         // 1. Transaction 생성 (총 지급 포인트로 기록)
+        // paymentKey를 transactionUniqueNo로 저장 (취소 시 사용)
         Transaction transaction = Transaction.builder()
                 .wallet(wallet)
                 .customer(wallet.getCustomer())
                 .store(store)
                 .transactionType(TransactionType.CHARGE)
                 .amount(totalPoints)
-                .transactionUniqueNo(apiResponse.getRec().getTransactionUniqueNo())
+                .transactionUniqueNo(paymentResult.getPaymentKey())
                 .build();
         transaction = transactionRepository.save(transaction);
 
@@ -252,39 +256,24 @@ public class PrepaymentService {
                 .build();
         settlementTaskRepository.save(settlementTask);
 
-        // 5. 카드 결제 완료 이벤트 발행
-        try {
-            PaymentEvent paymentEvent = PaymentEvent.builder()
-                    .customerId(wallet.getCustomer().getCustomerId())
-                    .customerName(wallet.getCustomer().getName())
-                    .storeId(store.getStoreId())
-                    .storeName(store.getStoreName())
-                    .ownerId(store.getOwner().getOwnerId())
-                    .transactionId(transaction.getTransactionId())
-                    .transactionUniqueNo(transaction.getTransactionUniqueNo())
-                    .paymentAmount(actualPaymentAmount)
-                    .totalPoints(totalPoints)
-                    .bonusPercentage(bonusPercentage)
-                    .bonusAmount(bonusAmount)
-                    .transactionTime(transaction.getCreatedAt())
-                    .build();
-
-            kafkaEventProducer.publishPaymentEvent(paymentEvent);
-
-            log.info("카드 결제 이벤트 발행 완료 - 고객ID: {}, 결제금액: {}, 총포인트: {}",
-                    wallet.getCustomer().getCustomerId(), actualPaymentAmount, totalPoints);
-        } catch (Exception e) {
-            log.warn("카드 결제 이벤트 발행 실패 - 고객ID: {}, 오류: {}",
-                    wallet.getCustomer().getCustomerId(), e.getMessage());
-            // 이벤트 발행 실패는 비즈니스 로직에 영향을 주지 않음
+        // 5. 점주에게 포인트 즉시 적립 (실제 결제 금액 기준)
+        Owner owner = store.getOwner();
+        if (owner != null) {
+            owner.addPoints(actualPaymentAmount);
+            ownerRepository.save(owner);
+            log.info("점주 포인트 적립 완료 - ownerId: {}, 적립금액: {}, 총포인트: {}",
+                    owner.getOwnerId(), actualPaymentAmount, owner.getPoints());
         }
+
+        log.info("카드 결제 완료 - 고객ID: {}, 결제금액: {}, 총포인트: {}",
+                wallet.getCustomer().getCustomerId(), actualPaymentAmount, totalPoints);
 
         // 6. 응답 생성
         long updatedBalance = balance.getBalance();
 
         return PrepaymentResponseDto.builder()
                 .transactionId(transaction.getTransactionId())
-                .transactionUniqueNo(apiResponse.getRec().getTransactionUniqueNo())
+                .transactionUniqueNo(paymentResult.getPaymentKey())
                 .storeId(store.getStoreId())
                 .storeName(store.getStoreName())
                 .paymentAmount(actualPaymentAmount)
@@ -301,9 +290,9 @@ public class PrepaymentService {
      */
     private String canonicalizeRequestBody(PrepaymentRequestDto requestDto) {
         CanonicalPrepayment canonical = CanonicalPrepayment.builder()
-                .cardNo(requestDto.getCardNo())
-                .cvc(requestDto.getCvc())
-                .paymentBalance(requestDto.getPaymentBalance())
+                .paymentKey(requestDto.getPaymentKey())
+                .orderId(requestDto.getOrderId())
+                .amount(requestDto.getAmount())
                 .build();
 
         try {

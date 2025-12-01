@@ -64,6 +64,30 @@ public class Owner {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @Column
-    private String userKey;
+    @Column(name = "points", nullable = false)
+    @Builder.Default
+    private Long points = 0L;
+
+    /**
+     * 포인트 추가 (선결제 시 점주에게 포인트 적립)
+     */
+    public void addPoints(Long amount) {
+        if (amount == null || amount <= 0) {
+            throw new IllegalArgumentException("적립 포인트는 0보다 커야 합니다.");
+        }
+        this.points += amount;
+    }
+
+    /**
+     * 포인트 차감 (점주가 포인트 출금 시)
+     */
+    public void deductPoints(Long amount) {
+        if (amount == null || amount <= 0) {
+            throw new IllegalArgumentException("차감 포인트는 0보다 커야 합니다.");
+        }
+        if (this.points < amount) {
+            throw new IllegalStateException("포인트가 부족합니다.");
+        }
+        this.points -= amount;
+    }
 }

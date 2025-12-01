@@ -8,6 +8,7 @@ import com.ssafy.keeping.domain.auth.security.JwtAuthenticationEntryPoint;
 import com.ssafy.keeping.domain.auth.security.JwtAuthenticationFilter;
 import com.ssafy.keeping.domain.auth.security.RoleAwareAuthorizationRequestResolver;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -30,6 +31,9 @@ import java.util.Arrays;
 @EnableMethodSecurity(prePostEnabled = true)
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    @Value("${fe.base-url}")
+    private String feBaseUrl;
 
     public static final String[] ALLOW_URLS = {
             "/auth/**",
@@ -74,9 +78,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 허용할 출처 설정
-        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
-        // 또는 특정 도메인만 허용: configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "https://your-domain.com"));
+        // 허용할 출처 설정 (fe.base-url 사용)
+        configuration.setAllowedOrigins(Arrays.asList(feBaseUrl));
 
         // 허용할 HTTP 메서드
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));

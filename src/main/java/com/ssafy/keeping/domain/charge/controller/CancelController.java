@@ -60,28 +60,31 @@ public class CancelController {
     }
 
     /**
-     * 카드 결제 취소 처리
-     * 
-     * @param cancelRequestDto 취소 요청 정보 (transactionUniqueNo, cardNo, cvc)
+     * 결제 취소 처리
+     *
+     * @param cancelRequestDto 취소 요청 정보 (paymentKey 또는 transactionUniqueNo, cancelReason)
      * @return 취소 처리 결과
      */
     @PostMapping("/payments/cancel")
     public ResponseEntity<ApiResponse<CancelResponseDto>> cancelPayment(
             @AuthenticationPrincipal Long customerId,
             @RequestBody @Valid CancelRequestDto cancelRequestDto) {
-        
-        log.info("카드 결제 취소 요청 - 거래번호: {}, 카드번호: {}", 
-                cancelRequestDto.getTransactionUniqueNo(), 
-                cancelRequestDto.getCardNo().substring(0, 4) + "****"); // 카드번호 마스킹
+
+        String identifier = cancelRequestDto.getPaymentKey() != null
+                ? cancelRequestDto.getPaymentKey()
+                : cancelRequestDto.getTransactionUniqueNo();
+
+        log.info("결제 취소 요청 - 고객ID: {}, 결제키/거래번호: {}, 취소사유: {}",
+                customerId, identifier, cancelRequestDto.getCancelReason());
 
         CancelResponseDto response = cancelService.cancelPayment(customerId, cancelRequestDto);
-        
-        log.info("카드 결제 취소 완료 - 취소 거래ID: {}", response.getCancelTransactionId());
-        
+
+        log.info("결제 취소 완료 - 취소 거래ID: {}", response.getCancelTransactionId());
+
         return ResponseEntity.ok(
                 ApiResponse.success(
-                    "결제 취소가 성공적으로 완료되었습니다.", 
-                    HttpStatus.OK.value(), 
+                    "결제 취소가 성공적으로 완료되었습니다.",
+                    HttpStatus.OK.value(),
                     response
                 )
         );

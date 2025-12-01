@@ -40,8 +40,8 @@ public class PrepaymentController {
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestBody @Valid PrepaymentRequestDto requestDto) {
 
-        log.info("선결제 요청 수신 - 가게ID: {}, 사용자ID: {}, 금액: {}, 멱등키: {}",
-                storeId, customerId, requestDto.getPaymentBalance(), idempotencyKey);
+        log.info("선결제 요청 수신 - 가게ID: {}, 사용자ID: {}, 금액: {}, orderId: {}, 멱등키: {}",
+                storeId, customerId, requestDto.getAmount(), requestDto.getOrderId(), idempotencyKey);
 
         IdempotentResult<PrepaymentResponseDto> result = prepaymentService.processPayment(storeId, customerId, idempotencyKey, requestDto);
         

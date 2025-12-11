@@ -42,8 +42,8 @@ public class RoleAwareAuthorizationRequestResolver implements OAuth2Authorizatio
     private OAuth2AuthorizationRequest rememberRole(HttpServletRequest request, OAuth2AuthorizationRequest base) {
         if (base == null) return null;
 
-//        String role = request.getParameter("role");
-        String role = redis.opsForValue().get("oauth:role:" + request.getSession().getId());
+       String role = request.getParameter("role");
+        // String role = redis.opsForValue().get("oauth:role:" + request.getSession().getId());
         
         // role이 있으면 Redis에 저장
         if (role != null && base.getState() != null) {

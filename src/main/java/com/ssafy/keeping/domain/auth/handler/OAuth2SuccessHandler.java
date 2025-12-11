@@ -130,11 +130,15 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             response.addCookie(regCookie);
 
         // 🚨 수정: 프론트엔드 전체 주소(URL)를 붙여서 보내야 브라우저가 프론트 서버로 이동합니다.
-            String targetUrl = feBaseUrl + (role.equals(UserRole.CUSTOMER) 
+            String frontendUrl = "https://keeping-frontend.vercel.app";
+            
+            String targetUrl = frontendUrl + (role.equals(UserRole.CUSTOMER) 
                     ? "/customer/register/step1" 
                     : "/owner/register/step1");
             
             System.out.println("✅ [OAUTH] Redirecting to Frontend: " + targetUrl);
+            
+            // 리다이렉트 실행
             response.sendRedirect(targetUrl);
         }
 

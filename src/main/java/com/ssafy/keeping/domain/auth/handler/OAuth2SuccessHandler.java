@@ -129,12 +129,13 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             regCookie.setMaxAge(300); // 5분 만료
             response.addCookie(regCookie);
 
-            if(role.equals(UserRole.CUSTOMER)){
-                response.sendRedirect("/customer/register/step1");
-            }
-            else {
-                response.sendRedirect("/owner/register/step1");
-            }
+        // 🚨 수정: 프론트엔드 전체 주소(URL)를 붙여서 보내야 브라우저가 프론트 서버로 이동합니다.
+            String targetUrl = feBaseUrl + (role.equals(UserRole.CUSTOMER) 
+                    ? "/customer/register/step1" 
+                    : "/owner/register/step1");
+            
+            System.out.println("✅ [OAUTH] Redirecting to Frontend: " + targetUrl);
+            response.sendRedirect(targetUrl);
         }
 
     }

@@ -47,13 +47,10 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_KEY }}
         script: |
-          # 1. 기존 서버 강제 종료
           sudo fuser -k 8080/tcp || true
           
-          # 2. 잠시 대기
           sleep 5
           
-          # 3. 서버 실행 (Nginx HTTPS 헤더 인식 옵션 필수!)
           nohup java -jar \
             -Dspring.profiles.active=prod \
             -Dserver.tomcat.remoteip.protocol-header=X-Forwarded-Proto \

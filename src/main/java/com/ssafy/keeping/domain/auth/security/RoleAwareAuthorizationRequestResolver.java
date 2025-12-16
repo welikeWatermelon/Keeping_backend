@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.auth.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -70,6 +71,7 @@ public class RoleAwareAuthorizationRequestResolver implements OAuth2Authorizatio
                     .build();
         } else {
             System.out.println("[OAUTH] role or state missing. role=" + role + " state=" + base.getState());
+            System.out.println("[OAUTH] feBaseUrl = " + feBaseUrl);
         }
         
         return base;

@@ -30,20 +30,20 @@ public class Owner {
     @Column(name = "provider_type", nullable = false)
     private AuthProvider providerType;
 
-    @Column(name = "email", nullable = false, length = 250)
+    @Column(name = "email", nullable = true, length = 250)
     private String email;
 
-    @Column(name = "phone_number", length = 50)
+    @Column(name = "phone_number", nullable = true length = 50)
     private String phoneNumber;
 
-    @Column(name = "birth")
+    @Column(name = "birth", nullable = true)
     private LocalDate birth;
 
     @Column(name = "name", nullable = false, length = 50)
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "gender")
+    @Column(name = "gender", nullable = true)
     private Gender gender;
 
     @Column(name = "img_url", length = 200)

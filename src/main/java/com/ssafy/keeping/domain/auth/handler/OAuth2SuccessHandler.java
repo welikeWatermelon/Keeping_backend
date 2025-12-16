@@ -159,8 +159,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 }
 
                 // 프론트로 리다이렉트 (기존 사용자와 동일한 경로)
+                String redirectUrl = feBaseUrl + "/auth/callback";
                 response.setStatus(HttpServletResponse.SC_SEE_OTHER);
-                response.sendRedirect("/auth/callback");
+                response.sendRedirect(redirectUrl);
 
             } catch (Exception e) {
                 System.err.println("[OAUTH] 회원가입 실패: " + e.getMessage());

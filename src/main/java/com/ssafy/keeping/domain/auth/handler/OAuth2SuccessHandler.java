@@ -44,6 +44,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
         System.out.println("=== OAUTH SUCCESS HANDLER START ===");
+        System.out.println("[OAUTH SUCCESS] feBaseUrl: " + feBaseUrl);
         System.out.println("[OAUTH SUCCESS] Request URI: " + request.getRequestURI());
         System.out.println("[OAUTH SUCCESS] Query String: " + request.getQueryString());
         System.out.println("[OAUTH SUCCESS] State parameter: " + request.getParameter("state"));

@@ -59,7 +59,6 @@ public class RoleAwareAuthorizationRequestResolver implements OAuth2Authorizatio
             String key = "oauth:state:" + base.getState();
 
             redis.opsForValue().set(key, role, Duration.ofMinutes(5));
-            System.out.println("[OAUTH] feBaseUrl = " + feBaseUrl);
             System.out.println("[OAUTH] save role = " + role + " state=" + base.getState());
             
             // prompt=login 항상 새로 로그인
@@ -71,7 +70,6 @@ public class RoleAwareAuthorizationRequestResolver implements OAuth2Authorizatio
                     .build();
         } else {
             System.out.println("[OAUTH] role or state missing. role=" + role + " state=" + base.getState());
-            System.out.println("[OAUTH] feBaseUrl = " + feBaseUrl);
         }
         
         return base;

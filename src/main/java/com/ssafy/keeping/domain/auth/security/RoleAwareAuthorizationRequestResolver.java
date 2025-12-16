@@ -23,6 +23,9 @@ public class RoleAwareAuthorizationRequestResolver implements OAuth2Authorizatio
     private final ClientRegistrationRepository repo;
     private final String authorizationRequestBaseUri;
 
+    @Value("${fe.base-url}")
+    private String feBaseUrl;
+
     private DefaultOAuth2AuthorizationRequestResolver delegate() {
         return new DefaultOAuth2AuthorizationRequestResolver(repo, authorizationRequestBaseUri);
     }

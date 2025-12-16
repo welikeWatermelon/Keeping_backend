@@ -42,10 +42,10 @@ public class CookieUtil {
     public void removeRefreshTokenFromCookie(HttpServletResponse response) {
         ResponseCookie responseCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(true)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Lax")
+                .sameSite("None")
                 .build();
 
         response.setHeader("Set-Cookie", responseCookie.toString());

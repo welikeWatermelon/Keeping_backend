@@ -1,6 +1,6 @@
 package com.ssafy.keeping.global.security;
 
-
+import jakarta.annotation.PostConstruct;
 import com.ssafy.keeping.domain.auth.handler.OAuth2ProviderRouter;
 import com.ssafy.keeping.domain.auth.handler.OAuth2SuccessHandler;
 import com.ssafy.keeping.domain.auth.security.JwtAccessDeniedHandler;
@@ -34,6 +34,15 @@ public class SecurityConfig {
 
     @Value("${fe.base-url}")
     private String feBaseUrl;
+
+    @PostConstruct
+    public void init() {
+        System.out.println("==============================================");
+        System.out.println("[SERVER STARTUP] feBaseUrl = " + feBaseUrl);
+        System.out.println("==============================================");
+    }
+  
+
 
     public static final String[] ALLOW_URLS = {
             "/auth/**",

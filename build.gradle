@@ -39,7 +39,6 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok'
 
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-	implementation 'net.nurigo:sdk:4.3.0'
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 	implementation 'org.springframework.security:spring-security-oauth2-jose'
 

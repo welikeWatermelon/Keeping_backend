@@ -37,7 +37,6 @@ public class SecurityConfig {
 
     public static final String[] ALLOW_URLS = {
             "/auth/**",
-            "/otp/**",
             "/oauth2/**",
             "/login",
             "/error",

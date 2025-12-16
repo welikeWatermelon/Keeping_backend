@@ -198,7 +198,8 @@ public class SecurityConfig {
 
                         // 결제
 //                        .requestMatchers("/charge/**", "/payments/**", "/cpqr/**").authenticated()
-
+                        .requestMatchers("/login/**", "/oauth2/**", "/auth/**", "/favicon.ico").permitAll()
+                                       
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 )

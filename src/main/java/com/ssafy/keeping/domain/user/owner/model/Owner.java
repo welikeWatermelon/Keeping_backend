@@ -33,7 +33,7 @@ public class Owner {
     @Column(name = "email", nullable = true, length = 250)
     private String email;
 
-    @Column(name = "phone_number", nullable = true length = 50)
+    @Column(name = "phone_number", nullable = true, length = 50)
     private String phoneNumber;
 
     @Column(name = "birth", nullable = true)

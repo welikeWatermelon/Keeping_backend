@@ -16,10 +16,10 @@ public class CookieUtil {
     public void addHttpOnlyRefreshCookie(HttpServletResponse response, String refreshToken, Duration ttl) {
         ResponseCookie responseCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, refreshToken)
                 .httpOnly(true)
-                .secure(false)
+                .secure(true)
                 .path("/")
                 .maxAge(ttl)
-                .sameSite("Lax")
+                .sameSite("None")
                 .build();
 
         response.setHeader("Set-Cookie", responseCookie.toString());

@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.auth.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +24,9 @@ public class RoleAwareAuthorizationRequestResolver implements OAuth2Authorizatio
     private final ClientRegistrationRepository repo;
     private final String authorizationRequestBaseUri;
 
+    @Value("${fe.base-url}")
+    private String feBaseUrl;
+
     private DefaultOAuth2AuthorizationRequestResolver delegate() {
         return new DefaultOAuth2AuthorizationRequestResolver(repo, authorizationRequestBaseUri);
     }
@@ -42,15 +46,20 @@ public class RoleAwareAuthorizationRequestResolver implements OAuth2Authorizatio
     private OAuth2AuthorizationRequest rememberRole(HttpServletRequest request, OAuth2AuthorizationRequest base) {
         if (base == null) return null;
 
-//        String role = request.getParameter("role");
-        String role = redis.opsForValue().get("oauth:role:" + request.getSession().getId());
+        String role = request.getParameter("role");
+        // String role = redis.opsForValue().get("oauth:role:" + request.getSession().getId());
         
+
+        if(role==null || role.isEmpty()){
+            System.out.println("⚠️ [OAUTH] URL에 role 파라미터가 없습니다. 'customer'로 기본 설정합니다.");
+            role="customer";
+        }
         // role이 있으면 Redis에 저장
         if (role != null && base.getState() != null) {
             String key = "oauth:state:" + base.getState();
 
             redis.opsForValue().set(key, role, Duration.ofMinutes(5));
-            System.out.println("[OAUTH] save role=" + role + " state=" + base.getState());
+            System.out.println("[OAUTH] save role = " + role + " state=" + base.getState());
             
             // prompt=login 항상 새로 로그인
             Map<String, Object> additionalParameters = new HashMap<>(base.getAdditionalParameters());

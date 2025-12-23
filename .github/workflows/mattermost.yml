@@ -1,0 +1,35 @@
+name: Mattermost Backend Push Notify (All Commits)
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build pushed commit list
+        run: |
+          git fetch --depth=100
+
+          COMMIT_LIST=$(git log --pretty=format:"%h: %s" ${{ github.event.before }}..${{ github.sha }} | sed ':a;N;$!ba;s/\n/\\n/g')
+
+          echo "COMMIT_LIST=$COMMIT_LIST" >> $GITHUB_ENV
+
+      - name: Send notification to Mattermost (All Commits Card)
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+          -d "{
+            \"attachments\": [
+              {
+                \"color\": \"#1976D2\",
+                \"title\": \"[BACK] GitHub Push\",
+                \"text\": \"작성자: ${GITHUB_ACTOR}\n레포: ${GITHUB_REPOSITORY}\n브랜치: ${GITHUB_REF_NAME}\n\n${COMMIT_LIST}\"
+              }
+            ]
+          }" \
+          https://meeting.ssafy.com/hooks/rui5ut38ji875fynujthadnd9w

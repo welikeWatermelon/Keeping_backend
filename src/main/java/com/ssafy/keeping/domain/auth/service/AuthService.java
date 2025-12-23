@@ -12,9 +12,6 @@ import com.ssafy.keeping.domain.user.owner.model.Owner;
 import com.ssafy.keeping.domain.user.owner.repository.OwnerRepository;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerRegisterResponse;
 import com.ssafy.keeping.domain.user.customer.dto.SignupCustomerResponse;
-import com.ssafy.keeping.domain.otp.session.RegSession;
-import com.ssafy.keeping.domain.otp.session.RegSessionStore;
-import com.ssafy.keeping.domain.otp.session.RegStep;
 import com.ssafy.keeping.domain.user.owner.dto.OwnerRegisterResponse;
 import com.ssafy.keeping.domain.user.owner.dto.SignupOwnerResponse;
 import com.ssafy.keeping.domain.user.owner.service.OwnerService;
@@ -38,12 +35,10 @@ public class AuthService {
     private final ObjectMapper om;
     private final CustomerRepository customerRepository;
     private final OwnerRepository ownerRepository;
-    private final RegSessionStore sessionStore;
     private final TokenService tokenService;
     private final CookieUtil cookieUtil;
 
     private final String SIGN_UP_INFO_KEY = "signup:info:";
-    private final String OTP_KEY_PREFIX = "otp:info:";
 
     public UserRole extractRoleFromState(String state) {
         // 세션에서 role 가져오기
@@ -109,59 +104,6 @@ public class AuthService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize signUpInfo", e);
         }
-    }
-
-    // otp 입력 후 합치기
-    public void attachOtpInfo(String regSessionId) {
-        String otpKey = OTP_KEY_PREFIX + regSessionId;
-        String otpValue = redis.opsForValue().get(otpKey);
-
-        RegSession regSession = new RegSession();
-        if(otpValue != null) {
-            try {
-                regSession = om.readValue(otpValue, RegSession.class);
-
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
-        } else {
-            System.out.println("[ATTACH OTP] otpValue is null!");
-        }
-
-        String signUpKey = SIGN_UP_INFO_KEY + regSessionId;
-        String signUpValue = redis.opsForValue().get(signUpKey);
-
-
-        Map<String, Object> map = new HashMap<>();
-
-        if(signUpValue != null) {
-            try {
-                map = om.readValue(signUpValue, Map.class);
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e); // 수정 필요
-            }
-        }
-
-        map.put("name", regSession.getName());
-        map.put("birth", regSession.getBirth());
-        map.put("phoneNumber", regSession.getPhoneNumber());
-        map.put("regStep", RegStep.PHONE_VERIFIED);
-        map.put("phoneVerifiedAt", regSession.getPhoneVerifiedAt());
-        map.put("gender", regSession.getGender().name());
-
-
-        try {
-            String finalValue = om.writeValueAsString(map);
-            redis.opsForValue().set(signUpKey, finalValue, Duration.ofMinutes(15));
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public PrefillResponse prefillInfo(String regSessionId) {
-        RegSession session = sessionStore.getSession(SIGN_UP_INFO_KEY, regSessionId);
-
-        return new PrefillResponse(session.getName(), session.getBirth(), session.getPhoneNumber());
     }
 
     // 고객 회원가입

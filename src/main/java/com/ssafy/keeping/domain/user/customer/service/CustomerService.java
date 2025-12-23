@@ -3,13 +3,9 @@ package com.ssafy.keeping.domain.user.customer.service;
 import com.ssafy.keeping.domain.auth.pin.service.PinAuthService;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
-import com.ssafy.keeping.domain.user.customer.dto.CustomerRegisterRequest;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerRegisterResponse;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileResponse;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileUpdateRequest;
-import com.ssafy.keeping.domain.otp.session.RegSession;
-import com.ssafy.keeping.domain.otp.session.RegSessionStore;
-import com.ssafy.keeping.domain.otp.session.RegStep;
 import com.ssafy.keeping.domain.user.dto.ProfileUploadResponse;
 import com.ssafy.keeping.global.s3.service.ImageService;
 import com.ssafy.keeping.domain.wallet.constant.WalletType;
@@ -31,60 +27,62 @@ import org.springframework.web.multipart.MultipartFile;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final RegSessionStore sessionStore;
     private final PinAuthService pinAuthService;
     private final WalletRepository walletRepository;
     private final ImageService imageService;
 
-    private static final String SIGN_UP_INFO_KEY = "signup:info:";
-
     /**
-     * 고객 등록 (간소화 버전 - 외부 API 연동 제거)
+     * OAuth 인증으로 고객 생성 (OTP 없이 즉시 등록)
+     * - 카카오 정보만으로 Customer + Wallet 생성
+     * - PIN은 나중에 설정 가능
      */
     @Transactional
-    public CustomerRegisterResponse RegisterCustomer(CustomerRegisterRequest dto) {
-        RegSession session = sessionStore.getSession(SIGN_UP_INFO_KEY, dto.getRegSessionId());
-        if(session.getRegStep() != RegStep.PHONE_VERIFIED) {
-            throw new IllegalStateException("휴대폰 인증이 필요합니다.");
-        }
+    public Customer createCustomerFromOAuth(String providerId,
+                                           com.ssafy.keeping.domain.auth.enums.AuthProvider provider,
+                                           String email,
+                                           String imgUrl,
+                                           String nickname) {
+        // 카카오 닉네임을 name으로 사용, 없으면 기본값
+        String name = (nickname != null && !nickname.isEmpty()) ? nickname : "카카오 사용자";
 
-        // 고객 생성 (userKey, 계좌, 카드 생성 없이 바로 등록)
+        // Customer 생성 (phone, birth, gender는 NULL)
         Customer customer = Customer.builder()
-                .providerType(session.getProvider())
-                .providerId(session.getProviderId())
-                .name(session.getName())
-                .email(session.getEmail())
-                .gender(session.getGender())
-                .birth(session.getBirth())
-                .imgUrl(session.getImgUrl())
-                .phoneNumber(session.getPhoneNumber())
+                .providerType(provider)
+                .providerId(providerId)
+                .email(email)
+                .name(name)
+                .imgUrl(imgUrl)
+                .phoneNumber(null)
+                .birth(null)
+                .gender(null)
                 .build();
 
         try {
             customer = customerRepository.save(customer);
-            log.info("고객 등록 완료 - customerId: {}, name: {}", customer.getCustomerId(), customer.getName());
-        } catch (DataIntegrityViolationException e){
-            log.error("고객 등록 실패 - 중복 데이터", e);
+            log.info("OAuth로 고객 등록 완료 - customerId: {}, name: {}, email: {}",
+                    customer.getCustomerId(), customer.getName(), customer.getEmail());
+        } catch (DataIntegrityViolationException e) {
+            log.error("OAuth 고객 등록 실패 - 중복 데이터", e);
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
 
-        // 결제 비밀번호 저장
-        pinAuthService.setOrUpdatePin(customer.getCustomerId(), dto.getPaymentPin());
-
-        // 지갑 생성
-        Wallet wallet = Wallet.builder().customer(customer).walletType(WalletType.INDIVIDUAL).build();
+        // 지갑 생성 (balance는 기본값 0)
+        Wallet wallet = Wallet.builder()
+                .customer(customer)
+                .walletType(WalletType.INDIVIDUAL)
+                .build();
 
         try {
             walletRepository.save(wallet);
-            log.info("고객 지갑 생성 완료 - customerId: {}", customer.getCustomerId());
+            log.info("OAuth 고객 지갑 생성 완료 - customerId: {}", customer.getCustomerId());
         } catch (Exception e) {
-            log.error("고객 지갑 생성 실패", e);
+            log.error("OAuth 고객 지갑 생성 실패", e);
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
 
-        // 세션 만료
-        sessionStore.deleteSession(SIGN_UP_INFO_KEY, dto.getRegSessionId());
-        return CustomerRegisterResponse.register(customer);
+        // CustomerPinAuth는 나중에 사용자가 직접 설정하도록 생성하지 않음
+
+        return customer;
     }
 
     public Customer validCustomer(Long customerId) {

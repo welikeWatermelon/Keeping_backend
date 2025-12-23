@@ -28,9 +28,11 @@ public class KakaoOAuth2UserService implements OAuth2UserService<OAuth2UserReque
 
         Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
         Map<String, Object> profile = (kakaoAccount != null) ? (Map<String, Object>) kakaoAccount.get("profile") : null;
+        Map<String, Object> properties = (Map<String, Object>) attributes.get("properties");
 
         String email = (kakaoAccount != null) ? (String)kakaoAccount.get("email") : null;
         String imgUrl = (profile != null) ? (String)profile.get("profile_image_url") : null;
+        String nickname = (properties != null) ? (String)properties.get("nickname") : null;
 
         String providerId = String.valueOf(attributes.get("id"));
         AuthProvider provider = AuthProvider.KAKAO;
@@ -40,6 +42,7 @@ public class KakaoOAuth2UserService implements OAuth2UserService<OAuth2UserReque
         mapped.put("providerId", providerId);
         mapped.put("provider", provider);
         mapped.put("imgUrl", imgUrl);
+        mapped.put("nickname", nickname);
 
         return new DefaultOAuth2User(
                 List.of(new SimpleGrantedAuthority("ROLE_USER")),

@@ -77,7 +77,7 @@ class WalletStoreLotRepositoryTest {
                 .providerId("owner-1").providerType(KAKAO)
                 .email("owner@ex.com").phoneNumber("010-9999-9999")
                 .birth(LocalDate.of(1990,1,1)).name("사장님").gender(MALE)
-                .imgUrl("https://img/owner.png").userKey("OW1").build();
+                .imgUrl("https://img/owner.png").build();
         em.persist(owner);
 
         store = storeRepo.save(Store.builder()

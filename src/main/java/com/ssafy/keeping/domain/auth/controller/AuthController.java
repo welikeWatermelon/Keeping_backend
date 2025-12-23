@@ -7,25 +7,15 @@ import com.ssafy.keeping.domain.auth.service.AuthService;
 import com.ssafy.keeping.domain.auth.service.KakaoService;
 import com.ssafy.keeping.domain.auth.service.TokenResponse;
 import com.ssafy.keeping.domain.auth.service.TokenService;
-import com.ssafy.keeping.domain.user.customer.dto.CustomerRegisterRequest;
-import com.ssafy.keeping.domain.user.customer.dto.CustomerRegisterResponse;
-import com.ssafy.keeping.domain.user.customer.dto.SignupCustomerResponse;
-import com.ssafy.keeping.domain.user.customer.service.CustomerService;
 import com.ssafy.keeping.domain.user.dto.UserProfile;
-import com.ssafy.keeping.domain.user.owner.dto.OwnerRegisterRequest;
-import com.ssafy.keeping.domain.user.owner.dto.OwnerRegisterResponse;
-import com.ssafy.keeping.domain.user.owner.dto.SignupOwnerResponse;
-import com.ssafy.keeping.domain.user.owner.service.OwnerService;
 import com.ssafy.keeping.global.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.Cookie;
@@ -45,8 +35,6 @@ public class AuthController {
 
     private final StringRedisTemplate redis;
     private final AuthService authService;
-    private final CustomerService customerService;
-    private final OwnerService ownerService;
     private final CookieUtil cookieUtil;
     private final JwtProvider jwtProvider;
     private final TokenService tokenService;
@@ -112,30 +100,6 @@ public class AuthController {
         } catch (IllegalArgumentException e) {
             return false;
         }
-    }
-
-    @PostMapping("/signup/customer")
-    public ResponseEntity<ApiResponse<SignupCustomerResponse>> completeCustomer(
-            @RequestBody @Valid CustomerRegisterRequest dto,
-            HttpServletResponse httpResponse
-    ) {
-        CustomerRegisterResponse response = customerService.RegisterCustomer(dto);
-        SignupCustomerResponse signUpResponse = authService.signUpTokenForCustomer(response, httpResponse);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("회원가입이 완료되었습니다", HttpStatus.CREATED.value(), signUpResponse));
-    }
-
-    @PostMapping("/signup/owner")
-    public ResponseEntity<ApiResponse<SignupOwnerResponse>> completeOwner(
-            @RequestBody @Valid OwnerRegisterRequest dto,
-            HttpServletResponse httpResponse
-    ) {
-        OwnerRegisterResponse response = ownerService.RegisterOwner(dto);
-        SignupOwnerResponse signUpResponse = authService.signUpTokenForOwner(response, httpResponse);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("회원가입이 완료되었습니다", HttpStatus.CREATED.value(), signUpResponse));
     }
 
     @PostMapping("/refresh")

@@ -20,6 +20,7 @@ import com.ssafy.keeping.global.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +37,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -50,24 +52,67 @@ public class AuthController {
     private final TokenService tokenService;
     private final KakaoService kakaoService;
 
-    @GetMapping("/kakao/customer")
-    public void kakaoLoginAsCustomer(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        // redis에 role 저장
-        System.out.println("[AUTH CONTROLLER] Saved role=CUSTOMER to session: " + request.getSession().getId());
-        redis.opsForValue().set("oauth:role:" + request.getSession().getId(), "CUSTOMER");
+    @GetMapping("/{provider}/{role}")
+    public void socialLogin(
+            @PathVariable String provider,
+            @PathVariable String role,
+            HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
 
-        response.sendRedirect("/api/oauth2/authorization/kakao");
+        // Provider 검증 (현재는 kakao만 지원, 추후 Google 확장 )
+        String normalizedProvider = provider.toLowerCase();
+        if (!isSupportedProvider(normalizedProvider)) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                "지원하지 않는 OAuth 제공자입니다: " + provider);
+            return;
+        }
+
+        // Role 검증
+        String normalizedRole = role.toUpperCase();
+        if (!isSupportedRole(normalizedRole)) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+                "유효하지 않은 역할입니다: " + role);
+            return;
+        }
+
+        // Redis에 role 저장
+        String sessionId = request.getSession().getId();
+        String redisKey = "oauth:role:" + sessionId;
+        redis.opsForValue().set(redisKey, normalizedRole);
+
+        log.info("[AUTH CONTROLLER] Saved role={} to session: {}", normalizedRole, sessionId);
+
+//        System.out.println(String.format("[AUTH CONTROLLER] Saved role=%s to session: %s",
+//            normalizedRole, sessionId));
+
+        // OAuth2 인증 URL로 리다이렉트
+        String redirectUrl = String.format("/api/oauth2/authorization/%s", normalizedProvider);
+        response.sendRedirect(redirectUrl);
     }
 
-    @GetMapping("/kakao/owner")
-    public void kakaoLoginAsOwner(HttpServletRequest request,HttpServletResponse response) throws IOException {
-        // redis에 role 저장
-        System.out.println("[AUTH CONTROLLER] Saved role=CUSTOMER to session: " + request.getSession().getId());
-        redis.opsForValue().set("oauth:role:" + request.getSession().getId(), "OWNER");
-
-        response.sendRedirect("/api/oauth2/authorization/kakao");
+    /**
+     * 지원하는 OAuth Provider인지 확인
+     * @param provider OAuth 제공자 (kakao, naver, google 등)
+     * @return 지원 여부
+     */
+    private boolean isSupportedProvider(String provider) {
+        // 추후 naver, google 등 추가 가능
+        return "kakao".equals(provider);
     }
 
+    /**
+     * 유효한 사용자 역할인지 확인
+     * @param role 사용자 역할 (CUSTOMER, OWNER)
+     * @return 유효성 여부
+     */
+    private boolean isSupportedRole(String role) {
+        try {
+            UserRole.valueOf(role);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
 
     @PostMapping("/signup/customer")
     public ResponseEntity<ApiResponse<SignupCustomerResponse>> completeCustomer(
@@ -364,19 +409,19 @@ public class AuthController {
 
     @GetMapping("/session-info")
     public ResponseEntity<ApiResponse<String>> getRegSessionId(HttpServletRequest request) {
-        System.out.println("[DEBUG] /auth/session-info called");
+        log.debug("[DEBUG] /auth/session-info called");
 
         // 모든 쿠키 출력
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
-                System.out.println("[DEBUG] Cookie found: " + cookie.getName() + " = " + cookie.getValue());
+                log.debug("[DEBUG] Cookie found: {} = {}", cookie.getName(), cookie.getValue());
             }
         } else {
-            System.out.println("[DEBUG] No cookies found in request");
+            log.debug("[DEBUG] No cookies found in request");
         }
 
         String regSessionId = cookieUtil.getRegSessionIdFromCookie(request);
-        System.out.println("[DEBUG] Extracted regSessionId: " + regSessionId);
+        log.debug("[DEBUG] Extracted regSessionId: {}", regSessionId);
 
         if (regSessionId == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)

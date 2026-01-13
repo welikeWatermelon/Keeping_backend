@@ -23,8 +23,10 @@ import java.util.stream.Collectors;
  * 정산 스케줄러 (포인트 기반)
  * - 선결제 시 점주에게 즉시 포인트 적립됨
  * - 이 스케줄러는 정산 상태 관리 및 기록 보관 용도로만 사용
+ *
+ * 간소화: 정산 시스템 비활성화
  */
-@Service
+//@Service
 @RequiredArgsConstructor
 @Slf4j
 public class SettlementScheduler {

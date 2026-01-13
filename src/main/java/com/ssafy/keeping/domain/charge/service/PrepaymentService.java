@@ -1,25 +1,21 @@
 package com.ssafy.keeping.domain.charge.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ssafy.keeping.domain.charge.canonical.CanonicalPrepayment;
+import com.ssafy.keeping.domain.charge.dto.request.PrepaymentConfirmRequest;
 import com.ssafy.keeping.domain.charge.dto.request.PrepaymentRequestDto;
+import com.ssafy.keeping.domain.charge.dto.request.PrepaymentReserveRequest;
+import com.ssafy.keeping.domain.charge.dto.response.PrepaymentReserveResponse;
 import com.ssafy.keeping.domain.charge.dto.response.PrepaymentResponseDto;
 import com.ssafy.keeping.domain.charge.model.ChargeBonus;
-import com.ssafy.keeping.domain.charge.service.ChargeBonusService;
-import com.ssafy.keeping.domain.idempotency.constant.IdemActorType;
-import com.ssafy.keeping.domain.idempotency.constant.IdemStatus;
-import com.ssafy.keeping.domain.idempotency.dto.IdemBegin;
-import com.ssafy.keeping.domain.idempotency.model.IdempotencyKey;
+import com.ssafy.keeping.domain.charge.model.PaymentReservation;
+import com.ssafy.keeping.domain.charge.repository.PaymentReservationRepository;
 import com.ssafy.keeping.domain.idempotency.model.IdempotentResult;
-import com.ssafy.keeping.domain.idempotency.repository.IdempotencyKeyRepository;
-import com.ssafy.keeping.domain.idempotency.service.IdempotencyService;
-import com.ssafy.keeping.domain.charge.model.SettlementTask;
-import com.ssafy.keeping.domain.charge.repository.SettlementTaskRepository;
+import com.ssafy.keeping.domain.payment.toss.TossPaymentClient;
+import com.ssafy.keeping.domain.payment.toss.dto.TossCancelRequest;
+import com.ssafy.keeping.domain.payment.toss.dto.TossCancelResponse;
+import com.ssafy.keeping.domain.payment.toss.dto.TossPaymentConfirmRequest;
+import com.ssafy.keeping.domain.payment.toss.dto.TossPaymentConfirmResponse;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
-import com.ssafy.keeping.domain.user.owner.model.Owner;
-import com.ssafy.keeping.domain.user.owner.repository.OwnerRepository;
 import com.ssafy.keeping.domain.payment.transactions.constant.TransactionType;
 import com.ssafy.keeping.domain.store.model.Store;
 import com.ssafy.keeping.domain.store.repository.StoreRepository;
@@ -34,153 +30,274 @@ import com.ssafy.keeping.domain.wallet.model.WalletStoreLot;
 import com.ssafy.keeping.domain.wallet.repository.WalletRepository;
 import com.ssafy.keeping.domain.wallet.repository.WalletStoreBalanceRepository;
 import com.ssafy.keeping.domain.wallet.repository.WalletStoreLotRepository;
-import com.ssafy.keeping.domain.payment.gateway.PaymentGateway;
-import com.ssafy.keeping.domain.payment.gateway.PaymentGatewayFactory;
-import com.ssafy.keeping.domain.payment.gateway.dto.PaymentRequest;
-import com.ssafy.keeping.domain.payment.gateway.dto.PaymentResult;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * 선결제(충전) 서비스 - 보안 강화 버전
+ * 예약 방식으로 금액 변조 방지
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional
 public class PrepaymentService {
 
-    private final PaymentGatewayFactory paymentGatewayFactory;
+    private final TossPaymentClient tossPaymentClient;
     private final CustomerRepository customerRepository;
     private final StoreRepository storeRepository;
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
     private final WalletStoreLotRepository walletStoreLotRepository;
     private final WalletStoreBalanceRepository walletStoreBalanceRepository;
-    private final SettlementTaskRepository settlementTaskRepository;
     private final ChargeBonusService chargeBonusService;
-    private final OwnerRepository ownerRepository;
+    private final PaymentReservationRepository paymentReservationRepository;
 
-    private final IdempotencyKeyRepository idempotencyKeyRepository;
-    private final IdempotencyService idempotencyService;
-    @Qualifier("canonicalObjectMapper")
-    private final ObjectMapper canonicalObjectMapper;
+    // 예약 만료 시간 (분)
+    private static final int RESERVATION_EXPIRES_MINUTES = 10;
 
-    private final ObjectMapper objectMapper;
-
-    // ObjectMapper : 자바객체 -> JSON / JSON -> 자바객체
     /**
-     * 선결제 처리 (멱등성 적용)
-     * - 멱등 스코프: (actorType=CUSTOMER, actorId=userId, path=/stores/{storeId}/prepayment, key=Idempotency-Key)
-     * - 상태 흐름:
-     *   DONE                           → 저장된 응답 재생(200 OK)
-     *   IN_PROGRESS(타 프로세스 선점)     → 202 Accepted
-     *   신규                            → 본 처리 수행 → DONE 기록 후 201 Created
+     * [1단계] 결제 예약 생성
+     * 서버에서 금액을 먼저 확정하여 금액 변조 방지
      */
-    public IdempotentResult<PrepaymentResponseDto> processPayment(Long storeId, Long customerId, String idempotencyKeyHeader, PrepaymentRequestDto requestDto) {
-        // 입력 검증
-        if (requestDto == null) {
-            throw new CustomException(ErrorCode.INVALID_REQUEST);
-        }
-        if (idempotencyKeyHeader == null || idempotencyKeyHeader.isBlank()) {
-            throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);
-        }
+    public PrepaymentReserveResponse reservePayment(
+            Long storeId,
+            Long customerId,
+            PrepaymentReserveRequest request) {
 
-        // 멱등 바디 정규화 → SHA-256
-        String canonicalBody = canonicalizeRequestBody(requestDto);
-        byte[] bodyHash = IdempotencyService.sha256(canonicalBody); // 암호화
-        // sha256 : 해시 암호화의 알고리즘
+        log.info("[예약] 시작 - 가게ID: {}, 고객ID: {}, 금액: {}원",
+                storeId, customerId, request.getAmount());
 
-        // 멱등 선점 또는 로드
-        UUID keyUuid = UUID.fromString(idempotencyKeyHeader);
-        // 클라이언트가 보내준 텍스트(String) 형식의 키를, 서버가 사용하기 좋은 객체(UUID) 형식으로 변환
-        String path = "/stores/" + storeId + "/prepayment";
-        IdemBegin begin = idempotencyService.beginOrLoad(IdemActorType.CUSTOMER, customerId, "POST", path, keyUuid, bodyHash);
-        // 이미 키가 있으면 기존 상태를 로드하고, 없으면 새로 생성해서 IN_PROGRESS로 설정
-        IdempotencyKey slot = begin.getRow();
-
-        // 본문 충돌 확인
-        if (idempotencyService.isBodyConflict(slot, bodyHash)) { // 기존 키가 있는데 본문이 다르면 true -> 충돌남, 새로 만든 키거나 본문이 같으면 충돌 안남
-            throw new CustomException(ErrorCode.IDEMPOTENCY_BODY_CONFLICT);
-        }
-
-        if (slot.getStatus() == IdemStatus.DONE) {
-            // 스냅샷이 있으면 그대로, 없으면 리소스 재조회해서 응답 구성
-            PrepaymentResponseDto replay;
-            if (slot.getResponseJson() != null) { // DONE 인데, 응답 결과가 있다면 반환
-                replay = parseSnapshot(slot.getResponseJson().toString());
-            } else {
-                throw new CustomException(ErrorCode.IDEMPOTENCY_REPLAY_UNAVAILABLE);
-            }
-            return IdempotentResult.okReplay(replay);
-        }
-
-        // 다른 처리에서 IN_PROGRESS로 선점
-        if (!begin.isCreated() && slot.getStatus() == IdemStatus.IN_PROGRESS) { // IN_PROGRESS인데, 만들어지지 않았다면 (DONE 상태가 아니라면)
-            return IdempotentResult.acceptedWithRetryAfterSeconds(2); // 2초뒤에 응답을 만들어줘
-        }
-
-        // 1. 사용자 정보 조회 및 검증
+        // 1. 고객 조회
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CUSTOMER_NOT_FOUND));
 
-        // 2. 가게 정보 조회 및 검증
+        // 2. 가게 조회
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STORE_NOT_FOUND));
 
-        // 3. 사용자의 개인 지갑 조회 또는 생성
-        Wallet wallet = findOrCreateIndividualWallet(customer);
+        // 3. orderId 생성 (UUID v4)
+        String orderId = "ORDER_" + UUID.randomUUID().toString().replace("-", "").toUpperCase();
 
-        // 4. 결제 게이트웨이를 통한 결제 승인
-        PaymentGateway gateway = paymentGatewayFactory.getDefaultGateway();
+        // 4. 주문명 생성
+        String orderName = request.getOrderName() != null
+                ? request.getOrderName()
+                : String.format("%s %,d원 충전", store.getStoreName(), request.getAmount());
 
-        PaymentRequest paymentRequest = PaymentRequest.builder()
-                .paymentKey(requestDto.getPaymentKey())
-                .orderId(requestDto.getOrderId())
-                .amount(requestDto.getAmount())
-                .storeId(storeId)
-                .customerId(customerId)
-                .customerName(customer.getName())
+        // 5. 만료 시간 설정 (10분 후)
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(RESERVATION_EXPIRES_MINUTES);
+
+        // 6. 예약 생성
+        PaymentReservation reservation = PaymentReservation.builder()
+                .orderId(orderId)
+                .customer(customer)
+                .store(store)
+                .amount(request.getAmount())
+                .orderName(orderName)
+                .status(PaymentReservation.ReservationStatus.PENDING)
+                .expiresAt(expiresAt)
                 .build();
 
-        PaymentResult paymentResult = gateway.processPayment(paymentRequest);
+        reservation = paymentReservationRepository.save(reservation);
 
-        if (!paymentResult.isSuccess()) {
-            log.error("결제 승인 실패 - errorCode: {}, message: {}",
-                    paymentResult.getErrorCode(), paymentResult.getErrorMessage());
+        log.info("[예약] 생성 완료 - 예약ID: {}, orderId: {}, 만료: {}",
+                reservation.getReservationId(), orderId, expiresAt);
+
+        // 7. 응답 생성
+        return PrepaymentReserveResponse.builder()
+                .reservationId(reservation.getReservationId())
+                .orderId(orderId)
+                .amount(request.getAmount())
+                .orderName(orderName)
+                .expiresAt(expiresAt)
+                .storeName(store.getStoreName())
+                .build();
+    }
+
+    /**
+     * [3단계] 결제 승인 (기존 processPayment를 대체)
+     * 예약된 금액과 비교하여 변조 방지
+     * 동시성 제어: 비관적 락으로 중복 결제 방지
+     */
+    public IdempotentResult<PrepaymentResponseDto> confirmPayment(
+            Long storeId,
+            Long customerId,
+            PrepaymentConfirmRequest request) {
+
+        log.info("[승인] 시작 - orderId: {}, 금액: {}원", request.getOrderId(), request.getAmount());
+
+        // 1. 예약 조회 (비관적 락 - 동시성 제어)
+        PaymentReservation reservation = paymentReservationRepository
+                .findByOrderIdWithLock(request.getOrderId())
+                .orElseThrow(() -> new CustomException(ErrorCode.TRANSACTION_NOT_FOUND));
+
+        // 2. 소유권 검증
+        if (!reservation.getCustomer().getCustomerId().equals(customerId)) {
+            log.error("[승인] 권한 없음 - 예약 고객: {}, 요청 고객: {}",
+                    reservation.getCustomer().getCustomerId(), customerId);
+            throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
+        }
+
+        // 3. 가게 검증
+        if (!reservation.getStore().getStoreId().equals(storeId)) {
+            log.error("[승인] 가게 불일치 - 예약 가게: {}, 요청 가게: {}",
+                    reservation.getStore().getStoreId(), storeId);
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // 4. 금액 검증 (핵심!)
+        if (!reservation.getAmount().equals(request.getAmount())) {
+            log.error("[승인] 금액 변조 감지 - 예약 금액: {}, 요청 금액: {}",
+                    reservation.getAmount(), request.getAmount());
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // 5. 만료 확인
+        if (reservation.isExpired()) {
+            log.error("[승인] 예약 만료 - orderId: {}, 만료 시각: {}",
+                    request.getOrderId(), reservation.getExpiresAt());
+            reservation.markAsExpired();
+            paymentReservationRepository.save(reservation);
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // 6. 상태 확인 (멱등성)
+        if (reservation.getStatus() == PaymentReservation.ReservationStatus.COMPLETED) {
+            log.info("[승인] 이미 처리됨 - orderId: {}, paymentKey: {}",
+                    request.getOrderId(), reservation.getPaymentKey());
+
+            // 기존 거래 조회하여 반환
+            Transaction existingTransaction = transactionRepository
+                    .findByTransactionUniqueNo(reservation.getPaymentKey())
+                    .orElseThrow(() -> new CustomException(ErrorCode.TRANSACTION_NOT_FOUND));
+
+            WalletStoreBalance balance = walletStoreBalanceRepository
+                    .findByWalletAndStore(existingTransaction.getWallet(), existingTransaction.getStore())
+                    .orElseThrow(() -> new CustomException(ErrorCode.WALLET_NOT_FOUND));
+
+            // LOT 조회하여 실제 보너스 정보 계산
+            WalletStoreLot existingLot = walletStoreLotRepository
+                    .findByOriginChargeTransaction(existingTransaction)
+                    .orElseThrow(() -> new CustomException(ErrorCode.WALLET_NOT_FOUND));
+
+            long paymentAmount = existingTransaction.getAmount();
+            long totalPoints = existingLot.getAmountTotal();
+            long bonusAmount = totalPoints - paymentAmount;
+            int bonusPercentage = bonusAmount > 0 ? (int)((bonusAmount * 100) / paymentAmount) : 0;
+
+            PrepaymentResponseDto response = PrepaymentResponseDto.builder()
+                    .transactionId(existingTransaction.getTransactionId())
+                    .transactionUniqueNo(existingTransaction.getTransactionUniqueNo())
+                    .storeId(existingTransaction.getStore().getStoreId())
+                    .storeName(existingTransaction.getStore().getStoreName())
+                    .paymentAmount(paymentAmount)
+                    .bonusPercentage(bonusPercentage)
+                    .bonusAmount(bonusAmount)
+                    .totalPoints(totalPoints)
+                    .transactionTime(existingTransaction.getCreatedAt())
+                    .remainingBalance(balance.getBalance())
+                    .build();
+
+            return IdempotentResult.okReplay(response);
+        }
+
+        // 7. 지갑 조회 또는 생성
+        Wallet wallet = findOrCreateIndividualWallet(reservation.getCustomer());
+
+        // 8. 토스페이먼츠 결제 승인 API 호출
+        TossPaymentConfirmRequest tossRequest = TossPaymentConfirmRequest.builder()
+                .paymentKey(request.getPaymentKey())
+                .orderId(request.getOrderId())
+                .amount(request.getAmount())
+                .build();
+
+        TossPaymentConfirmResponse tossResponse;
+        try {
+            tossResponse = tossPaymentClient.confirmPayment(tossRequest);
+        } catch (Exception e) {
+            // 토스 API 호출 실패
+            log.error("[승인] 토스 API 호출 실패", e);
+            reservation.markAsFailed();
+            paymentReservationRepository.save(reservation);
+            throw e;
+        }
+
+        if (!tossResponse.isSuccess()) {
+            log.error("[승인] 토스 결제 실패 - code: {}, message: {}",
+                    tossResponse.getCode(), tossResponse.getMessage());
+            reservation.markAsFailed();
+            paymentReservationRepository.save(reservation);
             throw new CustomException(ErrorCode.PAYMENT_CONFIRM_FAILED);
         }
 
-        // 5. 보너스 포인트 계산
-        long actualPaymentAmount = requestDto.getAmount();
-        ChargeBonus chargeBonus = chargeBonusService.findChargeBonusByAmount(storeId, actualPaymentAmount).orElse(null);
+        log.info("[승인] 토스 결제 성공 - paymentKey: {}", tossResponse.getPaymentKey());
 
-        long totalPoints = actualPaymentAmount;
-        int bonusPercentage = 0;
-        long bonusAmount = 0;
+        // 9. 포인트 적립 및 예약 완료 처리 (분산 트랜잭션 보상 처리)
+        try {
+            long paymentAmount = request.getAmount();
+            PrepaymentResponseDto response = savePaymentAndPoints(
+                    wallet,
+                    reservation.getStore(),
+                    paymentAmount,
+                    tossResponse
+            );
 
-        if (chargeBonus != null) {
-            bonusPercentage = chargeBonus.getBonusPercentage();
-            bonusAmount = actualPaymentAmount * bonusPercentage / 100;
-            totalPoints = actualPaymentAmount + bonusAmount;
-            log.info("보너스 적용 - 실제결제: {}원, 보너스: {}% ({}원), 총지급: {}포인트",
-                    actualPaymentAmount, bonusPercentage, bonusAmount, totalPoints);
+            // 10. 예약 완료 처리
+            reservation.markAsCompleted(request.getPaymentKey());
+            paymentReservationRepository.save(reservation);
+
+            log.info("[승인] 완료 - 거래ID: {}, 적립포인트: {}P",
+                    response.getTransactionId(), paymentAmount);
+
+            return IdempotentResult.created(response);
+
+        } catch (Exception e) {
+            // 토스 결제는 성공했지만 DB 저장 실패 → 보상 트랜잭션 (자동 취소)
+            log.error("[승인] DB 저장 실패, 보상 트랜잭션 시작 - paymentKey: {}", request.getPaymentKey(), e);
+
+            try {
+                compensatePayment(request.getPaymentKey(), "시스템 오류로 인한 자동 취소");
+                reservation.markAsFailed();
+                paymentReservationRepository.save(reservation);
+            } catch (Exception compensateEx) {
+                log.error("[승인] 보상 트랜잭션 실패 - 수동 처리 필요! paymentKey: {}",
+                        request.getPaymentKey(), compensateEx);
+                // TODO: 알람 발송, 관리자 알림 등
+            }
+
+            throw new CustomException(ErrorCode.PAYMENT_CONFIRM_FAILED);
         }
+    }
 
-        // 6. DB 업데이트 (트랜잭션 처리)
-        PrepaymentResponseDto response = updateDatabaseAfterPayment(wallet, store, actualPaymentAmount, totalPoints, bonusPercentage, bonusAmount, paymentResult);
+    /**
+     * 보상 트랜잭션: 토스 결제 취소
+     * 토스 결제는 성공했지만 DB 저장 실패 시 자동으로 취소
+     */
+    private void compensatePayment(String paymentKey, String cancelReason) {
+        log.warn("[보상] 토스 결제 취소 시작 - paymentKey: {}, 이유: {}", paymentKey, cancelReason);
 
-        // 멱등 완료 기록(DONE + 응답 스냅샷)
-        idempotencyService.completeCharge(slot, HttpStatus.CREATED.value(), response);
+        TossCancelRequest tossCancelRequest = TossCancelRequest.builder()
+                .cancelReason(cancelReason)
+                .build();
 
-        return IdempotentResult.created(response);
+        TossCancelResponse cancelResponse = tossPaymentClient.cancelPayment(paymentKey, tossCancelRequest);
+
+        if (cancelResponse.isSuccess()) {
+            log.info("[보상] 토스 결제 취소 성공 - paymentKey: {}", paymentKey);
+        } else {
+            log.error("[보상] 토스 결제 취소 실패 - paymentKey: {}, code: {}, message: {}",
+                    paymentKey, cancelResponse.getCode(), cancelResponse.getMessage());
+            throw new CustomException(ErrorCode.PAYMENT_CANCEL_FAILED);
+        }
     }
 
     /**
@@ -198,37 +315,53 @@ public class PrepaymentService {
     }
 
     /**
-     * 결제 성공 후 DB 업데이트
+     * 결제 성공 후 포인트 적립
+     * 보너스/정산 시스템 제거, 결제금액 = 포인트로 단순화
      */
-    private PrepaymentResponseDto updateDatabaseAfterPayment(
+    private PrepaymentResponseDto savePaymentAndPoints(
             Wallet wallet,
             Store store,
-            long actualPaymentAmount,
-            long totalPoints,
-            int bonusPercentage,
-            long bonusAmount,
-            PaymentResult paymentResult) {
+            long paymentAmount,
+            TossPaymentConfirmResponse tossResponse) {
 
-        // 1. Transaction 생성 (총 지급 포인트로 기록)
-        // paymentKey를 transactionUniqueNo로 저장 (취소 시 사용)
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 보너스 정책 조회
+        Optional<ChargeBonus> chargeBonusOpt = chargeBonusService.findChargeBonusByAmount(
+                store.getStoreId(),
+                paymentAmount
+        );
+
+        int bonusPercentage = 0;
+        long bonusAmount = 0L;
+
+        if (chargeBonusOpt.isPresent()) {
+            bonusPercentage = chargeBonusOpt.get().getBonusPercentage();
+            bonusAmount = (paymentAmount * bonusPercentage) / 100;
+            log.info("[보너스] 적용 - {}원 × {}% = {}원", paymentAmount, bonusPercentage, bonusAmount);
+        }
+
+        long totalPoints = paymentAmount + bonusAmount;
+
+        // 2. Transaction 생성 (원금만 저장)
         Transaction transaction = Transaction.builder()
                 .wallet(wallet)
                 .customer(wallet.getCustomer())
                 .store(store)
                 .transactionType(TransactionType.CHARGE)
-                .amount(totalPoints)
-                .transactionUniqueNo(paymentResult.getPaymentKey())
+                .amount(paymentAmount)
+                .transactionUniqueNo(tossResponse.getPaymentKey())
                 .build();
         transaction = transactionRepository.save(transaction);
 
-        // 2. WalletStoreLot 생성 (총 지급 포인트로 생성, 만료일: 1년 후)
-        LocalDateTime expiredAt = LocalDateTime.now().plusYears(1);
+        // 3. WalletStoreLot 생성 (만료일: 1년 후, 원금+보너스)
+        LocalDateTime expiredAt = now.plusYears(1);
         WalletStoreLot lot = WalletStoreLot.builder()
                 .wallet(wallet)
                 .store(store)
                 .amountTotal(totalPoints)
                 .amountRemaining(totalPoints)
-                .acquiredAt(LocalDateTime.now())
+                .acquiredAt(now)
                 .expiredAt(expiredAt)
                 .sourceType(LotSourceType.CHARGE)
                 .lotStatus(LotStatus.ACTIVE)
@@ -236,7 +369,7 @@ public class PrepaymentService {
                 .build();
         walletStoreLotRepository.save(lot);
 
-        // 3. WalletStoreBalance 업데이트 또는 생성
+        // 4. WalletStoreBalance 업데이트 또는 생성
         WalletStoreBalance balance = walletStoreBalanceRepository
                 .findByWalletAndStore(wallet, store)
                 .orElseGet(() -> WalletStoreBalance.builder()
@@ -248,98 +381,16 @@ public class PrepaymentService {
         balance.addBalance(totalPoints);
         walletStoreBalanceRepository.save(balance);
 
-        // 4. SettlementTask 생성 (실제 결제 금액으로 정산 예정)
-        SettlementTask settlementTask = SettlementTask.builder()
-                .transaction(transaction)
-                .actualPaymentAmount(actualPaymentAmount)
-                .status(SettlementTask.Status.PENDING)
-                .build();
-        settlementTaskRepository.save(settlementTask);
+        log.info("[선결제] 포인트 적립 완료 - 고객ID: {}, 결제금액: {}원, 보너스: {}원 ({}%), 총포인트: {}P",
+                wallet.getCustomer().getCustomerId(), paymentAmount, bonusAmount, bonusPercentage, totalPoints);
 
-        // 5. 점주에게 포인트 즉시 적립 (실제 결제 금액 기준)
-        Owner owner = store.getOwner();
-        if (owner != null) {
-            owner.addPoints(actualPaymentAmount);
-            ownerRepository.save(owner);
-            log.info("점주 포인트 적립 완료 - ownerId: {}, 적립금액: {}, 총포인트: {}",
-                    owner.getOwnerId(), actualPaymentAmount, owner.getPoints());
-        }
-
-        log.info("카드 결제 완료 - 고객ID: {}, 결제금액: {}, 총포인트: {}",
-                wallet.getCustomer().getCustomerId(), actualPaymentAmount, totalPoints);
-
-        // 6. 응답 생성
-        long updatedBalance = balance.getBalance();
-
+        // 5. 응답 생성
         return PrepaymentResponseDto.builder()
                 .transactionId(transaction.getTransactionId())
-                .transactionUniqueNo(paymentResult.getPaymentKey())
+                .transactionUniqueNo(tossResponse.getPaymentKey())
                 .storeId(store.getStoreId())
                 .storeName(store.getStoreName())
-                .paymentAmount(actualPaymentAmount)
-                .bonusPercentage(bonusPercentage)
-                .bonusAmount(bonusAmount)
-                .totalPoints(totalPoints)
-                .transactionTime(transaction.getCreatedAt())
-                .remainingBalance(updatedBalance)
-                .build();
-    }
-
-    /**
-     * 요청 바디 정규화 (키 정렬 + 공백 제거 등: ObjectMapper 설정에 따름)
-     */
-    private String canonicalizeRequestBody(PrepaymentRequestDto requestDto) {
-        CanonicalPrepayment canonical = CanonicalPrepayment.builder()
-                .paymentKey(requestDto.getPaymentKey())
-                .orderId(requestDto.getOrderId())
-                .amount(requestDto.getAmount())
-                .build();
-
-        try {
-            return canonicalObjectMapper.writeValueAsString(canonical);
-            // JSON 문자열로 변환
-        } catch (JsonProcessingException e) {
-            throw new CustomException(ErrorCode.REQUEST_CANONICALIZE_FAILED);
-        }
-    }
-
-    /**
-     * 스냅샷 JSON → DTO
-     */
-    private PrepaymentResponseDto parseSnapshot(String json) {
-        try {
-            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-            return objectMapper.readValue(bytes, PrepaymentResponseDto.class);
-        } catch (Exception e) {
-            throw new CustomException(ErrorCode.RESPONSE_SNAPSHOT_PARSE_FAILED);
-        }
-    }
-
-    /**
-     * transactionUniqueNo로 리소스를 재조회하여 응답 재구성 (스냅샷 없을 때 폴백)
-     */
-    private PrepaymentResponseDto rebuildFromResource(UUID transactionUniqueNo) {
-        Transaction transaction = transactionRepository.findByTransactionUniqueNo(transactionUniqueNo.toString())
-                .orElseThrow(() -> new CustomException(ErrorCode.TRANSACTION_NOT_FOUND));
-
-        WalletStoreBalance balance = walletStoreBalanceRepository
-                .findByWalletAndStore(transaction.getWallet(), transaction.getStore())
-                .orElseThrow(() -> new CustomException(ErrorCode.WALLET_BALANCE_NOT_FOUND));
-
-        SettlementTask settlementTask = settlementTaskRepository.findByTransaction(transaction)
-                .orElseThrow(() -> new CustomException(ErrorCode.SETTLEMENT_TASK_NOT_FOUND));
-
-        long actualPaymentAmount = settlementTask.getActualPaymentAmount();
-        long totalPoints = transaction.getAmount();
-        long bonusAmount = totalPoints - actualPaymentAmount;
-        int bonusPercentage = actualPaymentAmount > 0 ? (int) (bonusAmount * 100 / actualPaymentAmount) : 0;
-
-        return PrepaymentResponseDto.builder()
-                .transactionId(transaction.getTransactionId())
-                .transactionUniqueNo(transaction.getTransactionUniqueNo())
-                .storeId(transaction.getStore().getStoreId())
-                .storeName(transaction.getStore().getStoreName())
-                .paymentAmount(actualPaymentAmount)
+                .paymentAmount(paymentAmount)
                 .bonusPercentage(bonusPercentage)
                 .bonusAmount(bonusAmount)
                 .totalPoints(totalPoints)

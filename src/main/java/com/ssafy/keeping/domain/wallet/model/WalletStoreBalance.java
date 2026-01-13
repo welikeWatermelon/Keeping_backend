@@ -3,6 +3,7 @@ package com.ssafy.keeping.domain.wallet.model;
 import com.ssafy.keeping.domain.store.model.Store;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -36,7 +37,8 @@ public class WalletStoreBalance {
     @Column(name = "balance", nullable = false)
     private Long balance;
 
-    @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     public void addBalance(Long amount) {

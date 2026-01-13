@@ -53,7 +53,13 @@ public class SecurityConfig {
             "/ocr/*",
             "/customer/register/**",
             "/owners/register/**",
-            "/debug/redis"
+            "/debug/redis",
+            // 테스트용 static 파일들
+            "/index.html",
+            "/success.html",
+            "/fail.html",
+            "/js/**",
+            "/css/**"
     };
 
     public static final String[] TEMP_ALLOW_URLS = {

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>토스페이먼츠 테스트</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Keeping 선결제 테스트</h1>
+
+        <form id="paymentForm">
+            <div class="form-group">
+                <label>가게 ID:</label>
+                <input type="number" id="storeId" value="1" required>
+            </div>
+
+            <div class="form-group">
+                <label>충전 금액:</label>
+                <select id="amount">
+                    <option value="10000">10,000원</option>
+                    <option value="30000">30,000원</option>
+                    <option value="50000" selected>50,000원</option>
+                    <option value="100000">100,000원</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>주문명 (선택):</label>
+                <input type="text" id="orderName" placeholder="자동 생성">
+            </div>
+
+            <button type="submit">결제하기</button>
+        </form>
+
+        <div class="info">
+            <h3>테스트 정보</h3>
+            <p>클라이언트 키: test_ck_0RnYX2w532M1AJByZZDx8NeyqApQ</p>
+            <p>테스트 환경이므로 실제 결제 발생하지 않음</p>
+        </div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/payment.js"></script>
+</body>
+</html>

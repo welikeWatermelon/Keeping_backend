@@ -1,6 +1,6 @@
 package com.ssafy.keeping.domain.auth.security;
 
-import com.ssafy.keeping.domain.auth.enums.UserRole;
+import com.ssafy.keeping.domain.authRefact.enums.UserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;

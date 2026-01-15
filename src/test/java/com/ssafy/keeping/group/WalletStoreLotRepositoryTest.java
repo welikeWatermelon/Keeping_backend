@@ -30,8 +30,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static com.ssafy.keeping.domain.auth.enums.AuthProvider.KAKAO;
-import static com.ssafy.keeping.domain.auth.enums.Gender.MALE;
+import static com.ssafy.keeping.domain.authRefact.enums.AuthProvider.KAKAO;
+import static com.ssafy.keeping.domain.authRefact.enums.Gender.MALE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest

@@ -1,6 +1,6 @@
 package com.ssafy.keeping.domain.auth.service;
 
-import com.ssafy.keeping.domain.auth.enums.UserRole;
+import com.ssafy.keeping.domain.authRefact.enums.UserRole;
 import com.ssafy.keeping.domain.auth.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;

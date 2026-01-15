@@ -10,7 +10,7 @@ import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
 import com.ssafy.keeping.domain.user.owner.model.Owner;
 import com.ssafy.keeping.domain.user.owner.repository.OwnerRepository;
 import com.ssafy.keeping.domain.auth.security.JwtProvider;
-import com.ssafy.keeping.domain.auth.enums.UserRole;
+import com.ssafy.keeping.domain.authRefact.enums.UserRole;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

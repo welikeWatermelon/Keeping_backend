@@ -1,25 +1,13 @@
 package com.ssafy.keeping.domain.store.controller;
 
-
-import com.ssafy.keeping.domain.menuCategory.dto.MenuCategoryEditRequestDto;
-import com.ssafy.keeping.domain.menuCategory.dto.MenuCategoryRequestDto;
-import com.ssafy.keeping.domain.menuCategory.dto.MenuCategoryResponseDto;
-import com.ssafy.keeping.domain.store.dto.StoreEditRequestDto;
 import com.ssafy.keeping.domain.store.dto.StorePublicDto;
-import com.ssafy.keeping.domain.store.dto.StoreResponseDto;
-import com.ssafy.keeping.domain.store.dto.StoreRequestDto;
 import com.ssafy.keeping.domain.store.service.StoreService;
 import com.ssafy.keeping.global.response.ApiResponse;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
 import java.util.List;
 
 @RestController

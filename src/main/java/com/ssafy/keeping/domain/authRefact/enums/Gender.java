@@ -1,4 +1,4 @@
-package com.ssafy.keeping.domain.auth.enums;
+package com.ssafy.keeping.domain.authRefact.enums;
 
 public enum Gender {
     MALE, FEMALE;

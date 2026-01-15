@@ -1,9 +1,9 @@
 package com.ssafy.keeping.domain.user.customer.service;
 
+import com.ssafy.keeping.domain.authRefact.enums.AuthProvider;
 import com.ssafy.keeping.domain.auth.pin.service.PinAuthService;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
-import com.ssafy.keeping.domain.user.customer.dto.CustomerRegisterResponse;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileResponse;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileUpdateRequest;
 import com.ssafy.keeping.domain.user.dto.ProfileUploadResponse;
@@ -19,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Optional;
 
 
 @Service
@@ -38,7 +40,7 @@ public class CustomerService {
      */
     @Transactional
     public Customer createCustomerFromOAuth(String providerId,
-                                           com.ssafy.keeping.domain.auth.enums.AuthProvider provider,
+                                           AuthProvider provider,
                                            String email,
                                            String imgUrl,
                                            String nickname) {
@@ -88,6 +90,13 @@ public class CustomerService {
     public Customer validCustomer(Long customerId) {
         return customerRepository.findByCustomerIdAndDeletedAtIsNull(customerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    /**
+     * 소셜 로그인 제공자 타입과 제공자 ID로 고객 조회
+     */
+    public Optional<Customer> findByProviderTypeAndProviderId(AuthProvider providerType, String providerId) {
+        return customerRepository.findByProviderTypeAndProviderIdAndDeletedAtIsNull(providerType, providerId);
     }
 
     /**

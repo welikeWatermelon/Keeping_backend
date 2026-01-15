@@ -52,6 +52,16 @@ public class MenuService {
     /*
     * 가게 주인이 조작하는 service (권한 필요)
     * */
+    public List<MenuResponseDto> getAllMenusForOwner(Long ownerId, Long storeId) {
+        Owner owner = validOwner(ownerId);
+        Store store = validStore(storeId);
+
+        if (!store.getOwner().getOwnerId().equals(owner.getOwnerId()))
+            throw new CustomException(ErrorCode.OWNER_NOT_MATCH);
+
+        return menuRepository.findAllMenusByStoreId(storeId);
+    }
+
     public MenuResponseDto createMenu(Long ownerId, Long storeId, MenuRequestDto requestDto) {
         Owner owner = validOwner(ownerId);
         Store store = validStore(storeId);

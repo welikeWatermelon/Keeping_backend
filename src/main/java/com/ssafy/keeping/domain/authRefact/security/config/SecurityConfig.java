@@ -1,30 +1,25 @@
-package com.ssafy.keeping.global.security;
+package com.ssafy.keeping.domain.authRefact.security.config;
 
-import jakarta.annotation.PostConstruct;
-import com.ssafy.keeping.domain.auth.handler.OAuth2ProviderRouter;
-import com.ssafy.keeping.domain.auth.handler.OAuth2SuccessHandler;
-import com.ssafy.keeping.domain.auth.security.JwtAccessDeniedHandler;
-import com.ssafy.keeping.domain.auth.security.JwtAuthenticationEntryPoint;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ssafy.keeping.domain.authRefact.token.AccessTokenService;
 import com.ssafy.keeping.domain.auth.security.JwtAuthenticationFilter;
 import com.ssafy.keeping.domain.auth.security.RoleAwareAuthorizationRequestResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -34,15 +29,6 @@ public class SecurityConfig {
 
     @Value("${fe.base-url}")
     private String feBaseUrl;
-
-    @PostConstruct
-    public void init() {
-        System.out.println("==============================================");
-        System.out.println("[SERVER STARTUP] feBaseUrl = " + feBaseUrl);
-        System.out.println("==============================================");
-    }
-  
-
 
     public static final String[] ALLOW_URLS = {
             "/auth/**",
@@ -64,50 +50,59 @@ public class SecurityConfig {
             "/debug/redis"
     };
 
-    public static final String[] TEMP_ALLOW_URLS = {
-            "/stores/**", // 통계 API (/stores/{storeId}/statistics/**) 포함
-            "/api/**",
-            "/api/v1/stores/**",
-            "/wallets/**",
-            "/owners/*/stores/*/charge-bonus",
-            "/owners/*/stores/*/charge-bonus/*",
-            "/api/notifications/subscribe/**" // SSE 엔드포인트 명시적 허용
-    };
+//    private final ClientRegistrationRepository clientRegistrationRepository;
+//    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+//    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+//    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+//    private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
-    private final ClientRegistrationRepository clientRegistrationRepository;
-    private final OAuth2ProviderRouter oAuth2ProviderRouter;
-    private final OAuth2SuccessHandler oAuth2SuccessHandler;
-    private final StringRedisTemplate redis;
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
+
+
+
+
+
+
+
+
+
+
+
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
+    public JwtAuthenticationFilter jwtAuthenticationFilter(
+            AccessTokenService accessTokenService,
+            ObjectMapper objectMapper
+    ) {
+        return new JwtAuthenticationFilter(accessTokenService, objectMapper);
+    }
 
-        // 허용할 출처 설정 (fe.base-url 사용)
-        configuration.setAllowedOrigins(Arrays.asList(feBaseUrl));
+    @Bean
+    public NoStoreAuthResponseFilter noStoreAuthResponseFilter() {
+        return new NoStoreAuthResponseFilter();
+    }
 
-        // 허용할 HTTP 메서드
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-
-        // 허용할 헤더
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-
-        // 자격 증명 허용 (쿠키, Authorization 헤더 등)
-        configuration.setAllowCredentials(true);
-
-        // 노출할 헤더 (클라이언트에서 접근 가능한 헤더)
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "X-Total-Count"));
-
-        // preflight 요청 캐시 시간 (초)
-        configuration.setMaxAge(3600L);
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of(feBaseUrl)); // 프론트 도메인
+        config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true); // 쿠키 포함 허용
+        config.setMaxAge(3600L);
+//        config.setExposedHeaders(Arrays.asList("Authorization", "X-Total-Count")); // 프론트에서 Authorization 헤더를 응답에서 읽어야 하면 필요.
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
+
+
+
+
+
+
+
+
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -129,8 +124,8 @@ public class SecurityConfig {
 
                 // Form 로그인 비활성화
                 .formLogin(AbstractHttpConfigurer::disable)
-                // CORS 설정 적용
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // CORS 설정 적용
 
                 // 세션 관리 정책 -> OAuth2 로그인 완료 후 JWT로 전환 되어 현재는 IF_REQUIRED 로 작성
                 // TODO:  OAuth2 에서 세션에 role 을 담지 않고 넘겨주는 방식으로 리팩토링 후 수정

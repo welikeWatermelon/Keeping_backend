@@ -1,7 +1,7 @@
 package com.ssafy.keeping.domain.auth.controller;
 
 import com.ssafy.keeping.domain.auth.Util.CookieUtil;
-import com.ssafy.keeping.domain.auth.enums.UserRole;
+import com.ssafy.keeping.domain.authRefact.enums.UserRole;
 import com.ssafy.keeping.domain.auth.security.JwtProvider;
 import com.ssafy.keeping.domain.auth.service.AuthService;
 import com.ssafy.keeping.domain.auth.service.KakaoService;

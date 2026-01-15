@@ -1,6 +1,6 @@
 package com.ssafy.keeping.domain.auth.security;
 
-import com.ssafy.keeping.domain.auth.enums.UserRole;
+import com.ssafy.keeping.domain.authRefact.enums.UserRole;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
 import jakarta.servlet.FilterChain;

@@ -1,7 +1,7 @@
 package com.ssafy.keeping.domain.user.owner.model;
 
-import com.ssafy.keeping.domain.auth.enums.AuthProvider;
-import com.ssafy.keeping.domain.auth.enums.Gender;
+import com.ssafy.keeping.domain.authRefact.enums.AuthProvider;
+import com.ssafy.keeping.domain.authRefact.enums.Gender;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

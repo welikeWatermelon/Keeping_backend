@@ -1,9 +1,12 @@
 package com.ssafy.keeping.domain.user.owner.service;
 
+import com.ssafy.keeping.domain.authRefact.enums.AuthProvider;
 import com.ssafy.keeping.domain.user.dto.ProfileUploadResponse;
 import com.ssafy.keeping.domain.user.owner.model.Owner;
 import com.ssafy.keeping.domain.user.owner.repository.OwnerRepository;
-import com.ssafy.keeping.domain.user.owner.dto.OwnerRegisterResponse;
+
+import java.util.Optional;
+
 import com.ssafy.keeping.global.s3.service.ImageService;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
@@ -30,7 +33,7 @@ public class OwnerService {
      */
     @Transactional
     public Owner createOwnerFromOAuth(String providerId,
-                                     com.ssafy.keeping.domain.auth.enums.AuthProvider provider,
+                                     AuthProvider provider,
                                      String email,
                                      String imgUrl,
                                      String nickname) {
@@ -62,6 +65,12 @@ public class OwnerService {
         return owner;
     }
 
+    /**
+     * 소셜 로그인 제공자 타입과 제공자 ID로 점주 조회
+     */
+    public Optional<Owner> findByProviderTypeAndProviderId(AuthProvider providerType, String providerId) {
+        return ownerRepository.findByProviderTypeAndProviderIdAndDeletedAtIsNull(providerType, providerId);
+    }
 
     /**
      * 프로필 이미지 변경

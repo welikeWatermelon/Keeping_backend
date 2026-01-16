@@ -8,9 +8,16 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum ErrorCode {
 
+    // ---- Token ----
+    REFRESH_TOKEN_MISSING(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 없습니다."),
+    REFRESH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 유효하지 않습니다."),
+
+
     // ---- Signup ----
     SIGNUP_TICKET_INVALID(HttpStatus.BAD_REQUEST, "회원가입 티켓이 유효하지 않거나 만료되었습니다."),
     SIGNUP_ROLE_MISMATCH(HttpStatus.BAD_REQUEST, "요청한 회원 유형과 티켓의 회원 유형이 일치하지 않습니다."),
+    CUSTOMER_DUPLICATE(HttpStatus.CONFLICT, "이미 가입된 이메일/전화번호/소셜 계정 정보가 존재합니다."),
+    OWNER_DUPLICATE(HttpStatus.CONFLICT, "이미 가입된 점주 정보입니다."),
 
     // Store 관련
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 상품을 찾을 수 없습니다."),
@@ -78,7 +85,6 @@ public enum ErrorCode {
 
     // user 관련
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 사용자를 찾을 수 없습니다."),
-    CUSTOMER_DUPLICATE(HttpStatus.CONFLICT, "이미 가입된 이메일/전화번호/소셜 계정 정보가 존재합니다."),
 
     // 결제 요청(Payment Intent) / 검증
     PAYMENT_INIT_ORDER_EMPTY(HttpStatus.BAD_REQUEST, "주문 항목이 비어 있습니다."),

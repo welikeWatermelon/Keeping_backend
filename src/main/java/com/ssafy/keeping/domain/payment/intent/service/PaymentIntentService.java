@@ -34,7 +34,6 @@ import com.ssafy.keeping.domain.payment.qr.model.QrToken;
 import com.ssafy.keeping.domain.payment.qr.repository.QrTokenRepository;
 import com.ssafy.keeping.domain.store.model.Store;
 import com.ssafy.keeping.domain.store.repository.StoreRepository;
-import com.ssafy.keeping.domain.store.service.StoreService;
 import com.ssafy.keeping.domain.wallet.constant.WalletType;
 import com.ssafy.keeping.domain.wallet.model.Wallet;
 import com.ssafy.keeping.domain.wallet.repository.WalletRepository;
@@ -47,7 +46,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.*;

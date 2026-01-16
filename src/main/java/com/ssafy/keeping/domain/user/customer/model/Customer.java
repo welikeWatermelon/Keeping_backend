@@ -1,7 +1,7 @@
 package com.ssafy.keeping.domain.user.customer.model;
 
-import com.ssafy.keeping.domain.authRefact.enums.AuthProvider;
-import com.ssafy.keeping.domain.authRefact.enums.Gender;
+import com.ssafy.keeping.domain.auth.enums.AuthProvider;
+import com.ssafy.keeping.domain.auth.enums.Gender;
 import com.ssafy.keeping.domain.payment.transactions.model.Transaction;
 import com.ssafy.keeping.domain.wallet.model.Wallet;
 import jakarta.persistence.*;

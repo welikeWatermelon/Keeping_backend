@@ -1,6 +1,8 @@
 package com.ssafy.keeping.domain.user.owner.service;
 
-import com.ssafy.keeping.domain.authRefact.enums.AuthProvider;
+import com.ssafy.keeping.domain.auth.enums.AuthProvider;
+import com.ssafy.keeping.domain.auth.signup.dto.OwnerSignupRequest;
+import com.ssafy.keeping.domain.auth.signup.ticket.SignupTicketPayload;
 import com.ssafy.keeping.domain.user.dto.ProfileUploadResponse;
 import com.ssafy.keeping.domain.user.owner.model.Owner;
 import com.ssafy.keeping.domain.user.owner.repository.OwnerRepository;
@@ -13,7 +15,6 @@ import com.ssafy.keeping.global.exception.constants.ErrorCode;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,44 +27,61 @@ public class OwnerService {
     private final OwnerRepository ownerRepository;
     private final ImageService imageService;
 
-    /**
-     * OAuth 인증으로 점주 생성 (OTP 없이 즉시 등록)
-     * - 카카오 정보만으로 Owner 생성
-     * - 포인트는 0으로 초기화
-     */
     @Transactional
-    public Owner createOwnerFromOAuth(String providerId,
-                                     AuthProvider provider,
-                                     String email,
-                                     String imgUrl,
-                                     String nickname) {
-        // 카카오 닉네임을 name으로 사용, 없으면 기본값
-        String name = (nickname != null && !nickname.isEmpty()) ? nickname : "카카오 사용자";
+    public Owner registerOwner(OwnerSignupRequest request, SignupTicketPayload payload) {
 
-        // Owner 생성 (phone, birth, gender는 NULL)
         Owner owner = Owner.builder()
-                .providerType(provider)
-                .providerId(providerId)
-                .email(email)
-                .name(name)
-                .imgUrl(imgUrl)
-                .phoneNumber(null)
-                .birth(null)
-                .gender(null)
-                .points(0L)  // 초기 포인트 0
+                .providerType(payload.providerType())
+                .providerId(payload.providerId())
+                .name(request.name())
+                .email(request.email())
+                .gender(request.gender())
+                .birth(request.birth())
+                .imgUrl(payload.profileUrl())
+                .phoneNumber(request.phoneNumber())
                 .build();
 
-        try {
-            owner = ownerRepository.save(owner);
-            log.info("OAuth로 점주 등록 완료 - ownerId: {}, name: {}, email: {}",
-                    owner.getOwnerId(), owner.getName(), owner.getEmail());
-        } catch (DataIntegrityViolationException e) {
-            log.error("OAuth 점주 등록 실패 - 중복 데이터", e);
-            throw new CustomException(ErrorCode.BAD_REQUEST);
-        }
-
-        return owner;
+        return ownerRepository.save(owner);
     }
+
+//    /**
+//     * OAuth 인증으로 점주 생성 (OTP 없이 즉시 등록)
+//     * - 카카오 정보만으로 Owner 생성
+//     * - 포인트는 0으로 초기화
+//     */
+//    @Transactional
+//    public Owner createOwnerFromOAuth(String providerId,
+//                                     AuthProvider provider,
+//                                     String email,
+//                                     String imgUrl,
+//                                     String nickname) {
+//        // 카카오 닉네임을 name으로 사용, 없으면 기본값
+//        String name = (nickname != null && !nickname.isEmpty()) ? nickname : "카카오 사용자";
+//
+//        // Owner 생성 (phone, birth, gender는 NULL)
+//        Owner owner = Owner.builder()
+//                .providerType(provider)
+//                .providerId(providerId)
+//                .email(email)
+//                .name(name)
+//                .imgUrl(imgUrl)
+//                .phoneNumber(null)
+//                .birth(null)
+//                .gender(null)
+//                .points(0L)  // 초기 포인트 0
+//                .build();
+//
+//        try {
+//            owner = ownerRepository.save(owner);
+//            log.info("OAuth로 점주 등록 완료 - ownerId: {}, name: {}, email: {}",
+//                    owner.getOwnerId(), owner.getName(), owner.getEmail());
+//        } catch (DataIntegrityViolationException e) {
+//            log.error("OAuth 점주 등록 실패 - 중복 데이터", e);
+//            throw new CustomException(ErrorCode.BAD_REQUEST);
+//        }
+//
+//        return owner;
+//    }
 
     /**
      * 소셜 로그인 제공자 타입과 제공자 ID로 점주 조회

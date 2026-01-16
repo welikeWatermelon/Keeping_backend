@@ -2,7 +2,7 @@ package com.ssafy.keeping.domain.wallet.controller;
 
 import com.ssafy.keeping.domain.idempotency.model.IdempotentResult;
 import com.ssafy.keeping.domain.wallet.dto.*;
-import com.ssafy.keeping.domain.wallet.service.WalletServiceHS;
+import com.ssafy.keeping.domain.wallet.service.WalletService;
 import com.ssafy.keeping.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ import org.springframework.data.domain.PageRequest;
 @RequestMapping("/wallets")
 @RequiredArgsConstructor
 public class WalletController {
-    private final WalletServiceHS walletService;
+    private final WalletService walletService;
 
     @GetMapping("/groups/{groupId}")
     public ResponseEntity<ApiResponse<WalletResponseDto>> getGroupWallets(

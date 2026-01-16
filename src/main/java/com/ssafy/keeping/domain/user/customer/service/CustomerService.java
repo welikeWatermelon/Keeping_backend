@@ -1,7 +1,8 @@
 package com.ssafy.keeping.domain.user.customer.service;
 
 import com.ssafy.keeping.domain.authRefact.enums.AuthProvider;
-import com.ssafy.keeping.domain.auth.pin.service.PinAuthService;
+import com.ssafy.keeping.domain.authRefact.signup.dto.CustomerSignupRequest;
+import com.ssafy.keeping.domain.authRefact.signup.ticket.SignupTicketPayload;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileResponse;
@@ -13,11 +14,11 @@ import com.ssafy.keeping.domain.wallet.model.Wallet;
 import com.ssafy.keeping.domain.wallet.repository.WalletRepository;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Optional;
@@ -29,9 +30,31 @@ import java.util.Optional;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final PinAuthService pinAuthService;
     private final WalletRepository walletRepository;
     private final ImageService imageService;
+
+    /**
+     * 고객 생성
+     * @param request
+     * @param payload
+     * @return
+     */
+    @Transactional
+    public Customer registerCustomer(CustomerSignupRequest request, SignupTicketPayload payload) {
+
+        Customer customer = Customer.builder()
+                .providerType(payload.providerType())
+                .providerId(payload.providerId())
+                .name(request.name())
+                .email(request.email())
+                .gender(request.gender())
+                .birth(request.birth())
+                .imgUrl(payload.profileUrl())
+                .phoneNumber(request.phoneNumber())
+                .build();
+
+        return customerRepository.save(customer);
+    }
 
     /**
      * OAuth 인증으로 고객 생성 (OTP 없이 즉시 등록)

@@ -10,12 +10,16 @@ public class SignupTicketPayloadFactory {
     public static SignupTicketPayload payload(
             UserRole role,
             AuthProvider providerType,
-            String providerId
+            String providerId,
+            String nickname,
+            String profileUrl
     ) {
         return new SignupTicketPayload(
                 providerType,
                 providerId,
                 role,
+                nickname,
+                profileUrl,
                 Instant.now().getEpochSecond()
         );
     }

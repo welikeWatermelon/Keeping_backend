@@ -37,7 +37,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
         // 에러 응답 생성
         ExceptionDto exceptionDto = ExceptionDto.builder()
-                .error(String.valueOf(ErrorCode.UNAUTHORIZED.getHttpStatus()))
+                .error(String.valueOf(ErrorCode.UNAUTHORIZED.getHttpStatus().value()))
                 .message(ErrorCode.UNAUTHORIZED.getMessage())
                 .timestamp(LocalDateTime.now())
                 .path(request.getRequestURI())

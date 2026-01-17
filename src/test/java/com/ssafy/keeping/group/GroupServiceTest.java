@@ -1,6 +1,5 @@
 package com.ssafy.keeping.group;
 
-import com.ssafy.keeping.domain.group.constant.RequestStatus;
 import com.ssafy.keeping.domain.group.dto.GroupDisbandResponseDto;
 import com.ssafy.keeping.domain.group.dto.GroupLeaveResponseDto;
 import com.ssafy.keeping.domain.group.model.Group;
@@ -16,7 +15,7 @@ import com.ssafy.keeping.domain.wallet.model.Wallet;
 import com.ssafy.keeping.domain.wallet.repository.WalletRepository;
 import com.ssafy.keeping.domain.wallet.repository.WalletStoreBalanceRepository;
 import com.ssafy.keeping.domain.wallet.repository.WalletStoreLotRepository;
-import com.ssafy.keeping.domain.wallet.service.WalletServiceHS;
+import com.ssafy.keeping.domain.wallet.service.WalletService;
 import com.ssafy.keeping.global.exception.CustomException;
 import jdk.jfr.Name;
 import org.junit.jupiter.api.Test;
@@ -37,7 +36,7 @@ class GroupServiceTest {
     @InjectMocks
     private GroupService groupService;
 
-    @Mock private WalletServiceHS walletService;
+    @Mock private WalletService walletService;
     @Mock private CustomerRepository customerRepository;
     @Mock private GroupRepository groupRepository;
     @Mock private GroupMemberRepository groupMemberRepository;

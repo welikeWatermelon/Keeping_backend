@@ -37,23 +37,23 @@ public class Customer {
     @Column(name = "provider_type", nullable = false)
     private AuthProvider providerType;
 
-    @Column(name = "email", nullable = true, length = 250)
+    @Column(name = "email", nullable = false, length = 250)
     private String email;
 
-    @Column(name = "phone_number", nullable = true, length = 50)
+    @Column(name = "phone_number", nullable = false, length = 50)
     private String phoneNumber;
 
-    @Column(name = "birth", nullable = true)
+    @Column(name = "birth", nullable = false)
     private LocalDate birth;
 
     @Column(name = "name", nullable = false, length = 50)
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "gender", nullable = true)
+    @Column(name = "gender", nullable = false)
     private Gender gender;
 
-    @Column(name = "img_url", length = 200)
+    @Column(name = "img_url", nullable = false, length = 200)
     private String imgUrl;
 
     @CreationTimestamp
@@ -64,15 +64,8 @@ public class Customer {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @CreationTimestamp
-    @Column(name = "phone_verified_at")
-    private LocalDateTime phoneVerifiedAt;
-
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
-
-    @Column
-    private String userKey;
 
     @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Wallet wallet;

@@ -9,7 +9,7 @@ import com.ssafy.keeping.domain.notification.entity.NotificationType;
 import com.ssafy.keeping.domain.notification.service.NotificationService;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
-import com.ssafy.keeping.domain.wallet.service.WalletServiceHS;
+import com.ssafy.keeping.domain.wallet.service.WalletService;
 import com.ssafy.keeping.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,7 +28,8 @@ import static org.mockito.Mockito.*;
 class GroupServiceExpelMemberUnitTest {
 
     @InjectMocks GroupService groupService; // 대상
-    @Mock WalletServiceHS walletService;
+    @Mock
+    WalletService walletService;
     @Mock CustomerRepository customerRepository;
     @Mock GroupRepository groupRepository;
     @Mock GroupMemberRepository groupMemberRepository;

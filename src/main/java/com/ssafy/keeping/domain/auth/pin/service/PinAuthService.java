@@ -4,10 +4,11 @@ import com.ssafy.keeping.domain.auth.pin.model.CustomerPinAuth;
 import com.ssafy.keeping.domain.auth.pin.repository.CustomerPinAuthRepository;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
-import jakarta.transaction.Transactional;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -72,7 +73,7 @@ public class PinAuthService {
      * - 일치면 실패 카운트 초기화/성공시각 갱신(+필요시 재해시) → true
      */
     @Transactional
-    public boolean verify(Long customerId, String rawPin) {
+    public boolean verify(Long customerId, String rawPin) { // todo: 동시성(동시에 여러 verify 요청)에서 실패 카운트 갱신이 엇갈릴 수 있음 -> CustomerPinAuth에 @Version으로 낙관적 락 적용
         if (rawPin == null || rawPin.isBlank()) {
             throw new CustomException(ErrorCode.PIN_REQUIRED); // 결제 비밀번호(PIN)는 필수입니다.
         }

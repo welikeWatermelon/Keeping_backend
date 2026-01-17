@@ -29,7 +29,7 @@ import com.ssafy.keeping.domain.wallet.model.WalletStoreLot;
 import com.ssafy.keeping.domain.wallet.repository.WalletRepository;
 import com.ssafy.keeping.domain.wallet.repository.WalletStoreBalanceRepository;
 import com.ssafy.keeping.domain.wallet.repository.WalletStoreLotRepository;
-import com.ssafy.keeping.domain.wallet.service.WalletServiceHS;
+import com.ssafy.keeping.domain.wallet.service.WalletService;
 import com.ssafy.keeping.global.exception.CustomException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +50,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class WalletServiceSharePointsUnitTest {
 
-    @InjectMocks WalletServiceHS walletService;
+    @InjectMocks
+    WalletService walletService;
 
     @Mock StoreRepository storeRepository;
     @Mock WalletRepository walletRepository;

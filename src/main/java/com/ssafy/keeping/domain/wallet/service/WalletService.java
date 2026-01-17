@@ -36,11 +36,11 @@ import com.ssafy.keeping.global.exception.constants.ErrorCode;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -51,7 +51,7 @@ import static com.ssafy.keeping.global.util.TxUtils.afterCommit;
 
 @Service
 @RequiredArgsConstructor
-public class WalletServiceHS { // 충돌나는 것을 방지해 HS를 붙였으나 추후 합치겠습니다.
+public class WalletService { // 충돌나는 것을 방지해 HS를 붙였으나 추후 합치겠습니다.
     private final StoreRepository storeRepository;
     private final WalletRepository walletRepository;
     private final WalletStoreBalanceRepository balanceRepository;
@@ -66,6 +66,25 @@ public class WalletServiceHS { // 충돌나는 것을 방지해 HS를 붙였으�
     @Qualifier("canonicalObjectMapper")
     private final ObjectMapper canonicalObjectMapper;
 
+    @Transactional
+    public Wallet createOrGetIndividualWallet(Customer customer) {
+        // 이미 있으면 그대로 반환 (회원가입 재시도/중복 호출 대비)
+        return walletRepository.findByCustomerAndWalletType(customer, WalletType.INDIVIDUAL)
+                .orElseGet(() -> {
+                    try {
+                        return walletRepository.save(
+                                Wallet.builder()
+                                        .walletType(WalletType.INDIVIDUAL)
+                                        .customer(customer)
+                                        .build()
+                        );
+                    } catch (DataIntegrityViolationException e) {
+                        // 동시성으로 동시에 생성 시도한 경우
+                        return walletRepository.findByCustomerAndWalletType(customer, WalletType.INDIVIDUAL)
+                                .orElseThrow(() -> new CustomException(ErrorCode.WALLET_CREATE_FAILED));
+                    }
+                });
+    }
 
     public WalletResponseDto createGroupWallet(Group group) {
 

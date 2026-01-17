@@ -34,13 +34,13 @@ public class JwtAccessDeniedHandler implements AccessDeniedHandler {
         log.warn("접근 거부 예외 : {}", accessDeniedException.getMessage());
 
         // 에러 응답 설정
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 
         // 에러 응답 생성
         ExceptionDto exceptionDto = ExceptionDto.builder()
-                .error(String.valueOf(ErrorCode.FORBIDDEN.getHttpStatus()))
+                .error(String.valueOf(ErrorCode.FORBIDDEN.getHttpStatus().value()))
                 .message(ErrorCode.FORBIDDEN.getMessage())
                 .timestamp(LocalDateTime.now())
                 .path(request.getRequestURI())

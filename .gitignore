@@ -65,3 +65,6 @@ src/main/generated/
 src/resources/keeping-firebase-adminsdk.json
 src/resources/firebase/keeping-firebase-adminsdk.json
 src/resources/application.yml
+
+### CLAUDE
+CLAUDE.md

@@ -34,7 +34,6 @@ import com.ssafy.keeping.domain.payment.qr.model.QrToken;
 import com.ssafy.keeping.domain.payment.qr.repository.QrTokenRepository;
 import com.ssafy.keeping.domain.store.model.Store;
 import com.ssafy.keeping.domain.store.repository.StoreRepository;
-import com.ssafy.keeping.domain.store.service.StoreService;
 import com.ssafy.keeping.domain.wallet.constant.WalletType;
 import com.ssafy.keeping.domain.wallet.model.Wallet;
 import com.ssafy.keeping.domain.wallet.repository.WalletRepository;
@@ -47,7 +46,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -91,13 +89,13 @@ public class PaymentIntentService {
                                                                   PaymentInitiateRequest req) {
 
         if (req == null || req.getOrderItems() == null || req.getOrderItems().isEmpty()) {
-            throw new CustomException(ErrorCode.PAYMENT_INIT_ORDER_EMPTY);
+            throw new CustomException(ErrorCode.PAYMENT_INIT_ORDER_EMPTY); // 주문 항목이 비어있습니다.
         }
         if (req.getStoreId() == null) {
-            throw new CustomException(ErrorCode.PAYMENT_INIT_STORE_ID_REQUIRED);
+            throw new CustomException(ErrorCode.PAYMENT_INIT_STORE_ID_REQUIRED); // storeId는 필수입니다.
         }
         if (idempotencyKeyHeader == null || idempotencyKeyHeader.isBlank()) {
-            throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);
+            throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED); // Idempotency-Key 헤더가 필요합니다.
         }
 
         // 멱등 바디 정규화 → SHA-256
@@ -113,7 +111,7 @@ public class PaymentIntentService {
 
         // 본문 충돌 확인
         if (idempotencyService.isBodyConflict(slot, bodyHash)) {
-            throw new CustomException(ErrorCode.IDEMPOTENCY_BODY_CONFLICT);
+            throw new CustomException(ErrorCode.IDEMPOTENCY_BODY_CONFLICT); // Idempotency-Key 충돌: 요청 내용이 처음과 다릅니다.
         }
 
         if (slot.getStatus() == IdemStatus.DONE) {
@@ -144,52 +142,59 @@ public class PaymentIntentService {
         // QR 검증 - QrState가 ISSUED(발급됨)이어야 한다.
         QrToken qr = qrTokenRepository.findByQrTokenIdAndState(qrTokenId, QrState.ISSUED)
                 .orElseThrow(() -> new CustomException(ErrorCode.QR_NOT_FOUND));
+
         LocalDateTime now = LocalDateTime.now(clock);
+
         if (qr.getExpiresAt() != null && now.isAfter(qr.getExpiresAt())) {
-            throw new CustomException(ErrorCode.QR_EXPIRED);
+            throw new CustomException(ErrorCode.QR_EXPIRED); // QR 토큰이 만료되었습니다.
         }
         if (qr.getMode() != QrMode.CPQR) {
-            throw new CustomException(ErrorCode.QR_MODE_UNSUPPORTED);
+            throw new CustomException(ErrorCode.QR_MODE_UNSUPPORTED); // 지원하지 않는 QR 모드입니다.
         }
         if (!Objects.equals(qr.getBindStoreId(), req.getStoreId())) {
-            throw new CustomException(ErrorCode.QR_STORE_MISMATCH);
+            throw new CustomException(ErrorCode.QR_STORE_MISMATCH); // 바인딩된 매장과 일치하지 않는 요청입니다.
         }
 
         // TODO: ownerId 소속 매장 검증 로직
 
 
+
+
+
+
+
+        // 다른 도메인(애그리거트) 코드임 수정 필요...!!!
+
         // 메뉴 로딩/검증
-        Set<Long> uniqueMenuIds = new LinkedHashSet<>();
-        for (PaymentInitiateItemDto item : req.getOrderItems()) {
-            uniqueMenuIds.add(item.getMenuId());
-        }
+        Set<Long> uniqueMenuIds = req.getOrderItems().stream().map(orderItem -> orderItem.getMenuId()).collect(Collectors.toSet());
 
         List<Long> menuIdList = new ArrayList<>(uniqueMenuIds);
 
         List<Menu> menus = menuRepository.findAllById(menuIdList);
         if (menus.size() != uniqueMenuIds.size()) {
-            throw new CustomException(ErrorCode.MENU_NOT_FOUND);
-        }
-        Map<Long, Menu> menuById = new HashMap<>();
-        for (Menu m : menus) {
-            menuById.put(m.getMenuId(), m);
+            throw new CustomException(ErrorCode.MENU_NOT_FOUND); // 해당 메뉴를 찾을 수 없습니다.
         }
 
         for (Menu m : menus) {
             Long menuStoreId = m.getStore().getStoreId();
             if (!Objects.equals(menuStoreId, req.getStoreId())) {
-                throw new CustomException(ErrorCode.MENU_CROSS_STORE_CONFLICT);
+                throw new CustomException(ErrorCode.MENU_CROSS_STORE_CONFLICT); // 다른 매장의 메뉴가 포함되어 있습니다.
             }
             if (!m.isActive() || m.isSoldOut()) {
-                throw new CustomException(ErrorCode.MENU_UNAVAILABLE);
+                throw new CustomException(ErrorCode.MENU_UNAVAILABLE); // 품절/비활성 메뉴가 포함되어 있습니다.
             }
+        }
+
+        Map<Long, Menu> menuById = new HashMap<>();
+        for (Menu m : menus) {
+            menuById.put(m.getMenuId(), m);
         }
 
         // 합계 계산
         long total = 0L;
         for (PaymentInitiateItemDto item : req.getOrderItems()) {
             Menu m = menuById.get(item.getMenuId());
-            if (item.getQuantity() <= 0) throw new CustomException(ErrorCode.PAYMENT_INIT_QUANTITY_INVALID);
+            if (item.getQuantity() <= 0) throw new CustomException(ErrorCode.PAYMENT_INIT_QUANTITY_INVALID); // 수량은 1 이상이어야 합니다.
             total += (long) m.getPrice() * item.getQuantity();
         }
 
@@ -226,10 +231,8 @@ public class PaymentIntentService {
         itemRepository.saveAll(items);
 
         // 응답 구성
-        List<PaymentIntentItemView> itemViews = new ArrayList<>();
-        for (PaymentIntentItem it : items) {
-            itemViews.add(toItemView(it));
-        }
+        List<PaymentIntentItemView> itemViews = items.stream().map(item -> toItemView(item)).collect(Collectors.toList());
+
         PaymentIntentDetailResponse res = PaymentIntentDetailResponse.from(intent, itemViews);
 
         try {

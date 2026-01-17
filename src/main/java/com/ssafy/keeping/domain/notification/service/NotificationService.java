@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.notification.service;
 
+import com.ssafy.keeping.domain.auth.token.AccessTokenService;
 import com.ssafy.keeping.domain.notification.dto.NotificationResponseDto;
 import com.ssafy.keeping.domain.notification.entity.Notification;
 import com.ssafy.keeping.domain.notification.entity.NotificationType;
@@ -9,7 +10,6 @@ import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
 import com.ssafy.keeping.domain.user.owner.model.Owner;
 import com.ssafy.keeping.domain.user.owner.repository.OwnerRepository;
-import com.ssafy.keeping.domain.auth.security.JwtProvider;
 import com.ssafy.keeping.domain.auth.enums.UserRole;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +36,7 @@ public class NotificationService {
     private final CustomerRepository customerRepository;
     private final OwnerRepository ownerRepository;
     private final FcmService fcmService;
-    private final JwtProvider jwtProvider;
+    private final AccessTokenService accessTokenService;
     private final StringRedisTemplate redisTemplate;
 
     private static final Long DEFAULT_TIMEOUT = 60L * 1000 * 60; // 60분
@@ -402,7 +402,7 @@ public class NotificationService {
                 return null;
             }
 
-            Date issuedAt = jwtProvider.getIssuedAt(accessToken);
+            Date issuedAt = accessTokenService.getIssuedAt(accessToken);
             if (issuedAt == null) {
                 return null;
             }

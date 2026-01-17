@@ -1,28 +1,24 @@
 package com.ssafy.keeping.domain.user.customer.service;
 
-import com.ssafy.keeping.domain.auth.pin.service.PinAuthService;
+import com.ssafy.keeping.domain.auth.enums.AuthProvider;
+import com.ssafy.keeping.domain.auth.signup.dto.CustomerSignupRequest;
+import com.ssafy.keeping.domain.auth.signup.ticket.SignupTicketPayload;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
-import com.ssafy.keeping.domain.user.customer.dto.CustomerRegisterRequest;
-import com.ssafy.keeping.domain.user.customer.dto.CustomerRegisterResponse;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileResponse;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileUpdateRequest;
-import com.ssafy.keeping.domain.otp.session.RegSession;
-import com.ssafy.keeping.domain.otp.session.RegSessionStore;
-import com.ssafy.keeping.domain.otp.session.RegStep;
 import com.ssafy.keeping.domain.user.dto.ProfileUploadResponse;
 import com.ssafy.keeping.global.s3.service.ImageService;
-import com.ssafy.keeping.domain.wallet.constant.WalletType;
-import com.ssafy.keeping.domain.wallet.model.Wallet;
 import com.ssafy.keeping.domain.wallet.repository.WalletRepository;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Optional;
 
 
 @Service
@@ -31,65 +27,96 @@ import org.springframework.web.multipart.MultipartFile;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final RegSessionStore sessionStore;
-    private final PinAuthService pinAuthService;
     private final WalletRepository walletRepository;
     private final ImageService imageService;
 
-    private static final String SIGN_UP_INFO_KEY = "signup:info:";
-
     /**
-     * 고객 등록 (간소화 버전 - 외부 API 연동 제거)
+     * 고객 생성
+     * @param request
+     * @param payload
+     * @return
      */
     @Transactional
-    public CustomerRegisterResponse RegisterCustomer(CustomerRegisterRequest dto) {
-        RegSession session = sessionStore.getSession(SIGN_UP_INFO_KEY, dto.getRegSessionId());
-        if(session.getRegStep() != RegStep.PHONE_VERIFIED) {
-            throw new IllegalStateException("휴대폰 인증이 필요합니다.");
-        }
+    public Customer registerCustomer(CustomerSignupRequest request, SignupTicketPayload payload) {
 
-        // 고객 생성 (userKey, 계좌, 카드 생성 없이 바로 등록)
         Customer customer = Customer.builder()
-                .providerType(session.getProvider())
-                .providerId(session.getProviderId())
-                .name(session.getName())
-                .email(session.getEmail())
-                .gender(session.getGender())
-                .birth(session.getBirth())
-                .imgUrl(session.getImgUrl())
-                .phoneNumber(session.getPhoneNumber())
+                .providerType(payload.providerType())
+                .providerId(payload.providerId())
+                .name(request.name())
+                .email(request.email())
+                .gender(request.gender())
+                .birth(request.birth())
+                .imgUrl(payload.profileUrl())
+                .phoneNumber(request.phoneNumber())
                 .build();
 
-        try {
-            customer = customerRepository.save(customer);
-            log.info("고객 등록 완료 - customerId: {}, name: {}", customer.getCustomerId(), customer.getName());
-        } catch (DataIntegrityViolationException e){
-            log.error("고객 등록 실패 - 중복 데이터", e);
-            throw new CustomException(ErrorCode.BAD_REQUEST);
-        }
-
-        // 결제 비밀번호 저장
-        pinAuthService.setOrUpdatePin(customer.getCustomerId(), dto.getPaymentPin());
-
-        // 지갑 생성
-        Wallet wallet = Wallet.builder().customer(customer).walletType(WalletType.INDIVIDUAL).build();
-
-        try {
-            walletRepository.save(wallet);
-            log.info("고객 지갑 생성 완료 - customerId: {}", customer.getCustomerId());
-        } catch (Exception e) {
-            log.error("고객 지갑 생성 실패", e);
-            throw new CustomException(ErrorCode.BAD_REQUEST);
-        }
-
-        // 세션 만료
-        sessionStore.deleteSession(SIGN_UP_INFO_KEY, dto.getRegSessionId());
-        return CustomerRegisterResponse.register(customer);
+        return customerRepository.save(customer);
     }
+
+//    /**
+//     * OAuth 인증으로 고객 생성 (OTP 없이 즉시 등록)
+//     * - 카카오 정보만으로 Customer + Wallet 생성
+//     * - PIN은 나중에 설정 가능
+//     */
+//    @Transactional
+//    public Customer createCustomerFromOAuth(String providerId,
+//                                           AuthProvider provider,
+//                                           String email,
+//                                           String imgUrl,
+//                                           String nickname) {
+//        // 카카오 닉네임을 name으로 사용, 없으면 기본값
+//        String name = (nickname != null && !nickname.isEmpty()) ? nickname : "카카오 사용자";
+//
+//        // Customer 생성 (phone, birth, gender는 NULL)
+//        Customer customer = Customer.builder()
+//                .providerType(provider)
+//                .providerId(providerId)
+//                .email(email)
+//                .name(name)
+//                .imgUrl(imgUrl)
+//                .phoneNumber(null)
+//                .birth(null)
+//                .gender(null)
+//                .build();
+//
+//        try {
+//            customer = customerRepository.save(customer);
+//            log.info("OAuth로 고객 등록 완료 - customerId: {}, name: {}, email: {}",
+//                    customer.getCustomerId(), customer.getName(), customer.getEmail());
+//        } catch (DataIntegrityViolationException e) {
+//            log.error("OAuth 고객 등록 실패 - 중복 데이터", e);
+//            throw new CustomException(ErrorCode.BAD_REQUEST);
+//        }
+//
+//        // 지갑 생성 (balance는 기본값 0)
+//        Wallet wallet = Wallet.builder()
+//                .customer(customer)
+//                .walletType(WalletType.INDIVIDUAL)
+//                .build();
+//
+//        try {
+//            walletRepository.save(wallet);
+//            log.info("OAuth 고객 지갑 생성 완료 - customerId: {}", customer.getCustomerId());
+//        } catch (Exception e) {
+//            log.error("OAuth 고객 지갑 생성 실패", e);
+//            throw new CustomException(ErrorCode.BAD_REQUEST);
+//        }
+//
+//        // CustomerPinAuth는 나중에 사용자가 직접 설정하도록 생성하지 않음
+//
+//        return customer;
+//    }
 
     public Customer validCustomer(Long customerId) {
         return customerRepository.findByCustomerIdAndDeletedAtIsNull(customerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    /**
+     * 소셜 로그인 제공자 타입과 제공자 ID로 고객 조회
+     */
+    public Optional<Customer> findByProviderTypeAndProviderId(AuthProvider providerType, String providerId) {
+        return customerRepository.findByProviderTypeAndProviderIdAndDeletedAtIsNull(providerType, providerId);
     }
 
     /**

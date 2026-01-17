@@ -64,15 +64,8 @@ public class Customer {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @CreationTimestamp
-    @Column(name = "phone_verified_at")
-    private LocalDateTime phoneVerifiedAt;
-
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
-
-    @Column
-    private String userKey;
 
     @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Wallet wallet;

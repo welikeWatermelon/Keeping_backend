@@ -1,9 +1,7 @@
 package com.ssafy.keeping.global.exception.handlers;
 
-
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
-import com.ssafy.keeping.global.exception.dto.ExceptionDto;
 import com.ssafy.keeping.global.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -14,8 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import java.time.LocalDateTime;
 
 @Slf4j
 @RestControllerAdvice
@@ -61,8 +57,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiResponse<?>> handleDataIntegrity(DataIntegrityViolationException e) {
-        log.error("DataIntegrityViolationException 발생: {}", e.getMessage(), e);
+    public ResponseEntity<ApiResponse<?>> handleDataIntegrity(DataIntegrityViolationException e, HttpServletRequest request) {
+        log.error("DataIntegrityViolationException at {}: {}", request.getRequestURI(), e.getMessage(), e);
 
         if (isUniqueViolation(e)) {
             // 정확한 에러 메시지 로깅
@@ -73,10 +69,10 @@ public class GlobalExceptionHandler {
             }
 
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponse.error("중복되는 입력값입니다.", 409));
+                    .body(ApiResponse.error("중복되는 입력값입니다.", HttpStatus.CONFLICT.value()));
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("무결성 제약 위반", 400));
+                .body(ApiResponse.error("무결성 제약 위반", HttpStatus.BAD_REQUEST.value()));
     }
 
     private boolean isUniqueViolation(Throwable t) {
@@ -101,9 +97,21 @@ public class GlobalExceptionHandler {
 
     // 3. 커스텀 예외
     @ExceptionHandler(CustomException.class)
-    public ResponseEntity<ApiResponse<Void>> handleCustomException(CustomException e) {
+    public ResponseEntity<ApiResponse<Void>> handleCustomException(CustomException e, HttpServletRequest request) {
         ErrorCode errorCode = e.getErrorCode();
-        log.warn("Custom exception: {}", errorCode.getMessage());
+
+        if (e.getCause() != null) {
+            log.warn("Custom exception at {}: {} ({})",
+                    request.getRequestURI(),
+                    errorCode.name(),
+                    errorCode.getMessage(),
+                    e); // cause 포함 stacktrace
+        } else {
+            log.warn("Custom exception at {}: {} ({})",
+                    request.getRequestURI(),
+                    errorCode.name(),
+                    errorCode.getMessage());
+        }
 
         return ResponseEntity
                 .status(errorCode.getHttpStatus())

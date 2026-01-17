@@ -44,9 +44,10 @@ public class OwnerMenuController {
 
     @GetMapping()
     public ResponseEntity<ApiResponse<List<MenuResponseDto>>> getAllMenus(
+            @AuthenticationPrincipal Long ownerId,
             @PathVariable Long storeId
     ) {
-        List<MenuResponseDto> dtos = menuService.getAllMenus(storeId);
+        List<MenuResponseDto> dtos = menuService.getAllMenusForOwner(ownerId, storeId);
         return ResponseEntity.ok(ApiResponse.success("메뉴가 전체 조회되었습니다", HttpStatus.OK.value(), dtos));
     }
 

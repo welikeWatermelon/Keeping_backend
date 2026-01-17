@@ -108,7 +108,7 @@ public class CancelService {
     }
 
     /**
-     * 취소 가능 검증 - 간소화 버전
+     * 취소 가능 검증 - 비관적 락 적용
      */
     private Transaction validateCancellation(Long customerId, String paymentKey) {
         // 1. 거래 조회
@@ -126,9 +126,9 @@ public class CancelService {
             throw new CustomException(ErrorCode.CANCEL_NOT_AVAILABLE);
         }
 
-        // 4. 포인트가 모두 남아있는지 확인
+        // 4. 포인트가 모두 남아있는지 확인 (🔒 비관적 락)
         WalletStoreLot lot = walletStoreLotRepository
-                .findByOriginChargeTransaction(originalTransaction)
+                .findByOriginChargeTransactionWithLock(originalTransaction)
                 .orElseThrow(() -> new CustomException(ErrorCode.WALLET_NOT_FOUND));
 
         if (!lot.getAmountRemaining().equals(lot.getAmountTotal())) {
@@ -137,7 +137,7 @@ public class CancelService {
             throw new CustomException(ErrorCode.CANCEL_NOT_AVAILABLE);
         }
 
-        log.info("[취소] 검증 완료 - 거래ID: {}, 금액: {}",
+        log.info("[취소] 검증 완료 (락 획득) - 거래ID: {}, 금액: {}",
                 originalTransaction.getTransactionId(), originalTransaction.getAmount());
 
         return originalTransaction;

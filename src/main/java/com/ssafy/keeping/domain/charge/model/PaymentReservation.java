@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
     name = "payment_reservations",
     indexes = {
         @Index(name = "idx_order_id", columnList = "orderId", unique = true),
-        @Index(name = "idx_customer_status", columnList = "customerId, status"),
+//        @Index(name = "idx_customer_status", columnList = "customerId, status"),
         @Index(name = "idx_expires_at", columnList = "expiresAt")
     }
 )

@@ -21,6 +21,14 @@ public interface WalletStoreLotRepository extends JpaRepository<WalletStoreLot, 
     
     Optional<WalletStoreLot> findByOriginChargeTransaction(Transaction originChargeTransaction);
 
+    /**
+     * 결제 취소 시 정합성 보장을 위한 비관적 락
+     * SELECT ... FOR UPDATE로 해당 로트를 독점적으로 잠금
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM WalletStoreLot l WHERE l.originChargeTransaction = :transaction")
+    Optional<WalletStoreLot> findByOriginChargeTransactionWithLock(@Param("transaction") Transaction transaction);
+
     // 개인 LOT 소진용: FIFO + 행잠금
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

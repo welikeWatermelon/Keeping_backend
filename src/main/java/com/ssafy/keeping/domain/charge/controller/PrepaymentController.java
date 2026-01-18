@@ -1,6 +1,9 @@
 package com.ssafy.keeping.domain.charge.controller;
 
+import com.ssafy.keeping.domain.charge.dto.request.PrepaymentConfirmRequest;
 import com.ssafy.keeping.domain.charge.dto.request.PrepaymentRequestDto;
+import com.ssafy.keeping.domain.charge.dto.request.PrepaymentReserveRequest;
+import com.ssafy.keeping.domain.charge.dto.response.PrepaymentReserveResponse;
 import com.ssafy.keeping.domain.charge.dto.response.PrepaymentResponseDto;
 import com.ssafy.keeping.domain.charge.service.PrepaymentService;
 import com.ssafy.keeping.domain.idempotency.model.IdempotentResult;
@@ -26,46 +29,71 @@ public class PrepaymentController {
     private final PrepaymentService prepaymentService;
 
     /**
-     * 선결제 처리 (멱등성 적용)
-     * 
+     * [1단계] 선결제 예약 (보안 강화)
+     * 서버에서 금액을 먼저 확정하여 금액 변조 방지
+     *
      * @param storeId 가게 ID
-     * @param idempotencyKey 멱등성 키 헤더
-     * @param requestDto 선결제 요청 정보
-     * @return 선결제 처리 결과
+     * @param customerId 고객 ID (인증 정보)
+     * @param request 예약 요청 (금액)
+     * @return 예약 정보 (orderId, amount, expiresAt)
      */
-    @PostMapping("/{storeId}/prepayment")
-    public ResponseEntity<ApiResponse<PrepaymentResponseDto>> processPrePayment(
+    @PostMapping("/{storeId}/prepayment/reserve")
+    public ResponseEntity<ApiResponse<PrepaymentReserveResponse>> reservePrepayment(
             @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId,
-            @AuthenticationPrincipal Long customerId,
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @RequestBody @Valid PrepaymentRequestDto requestDto) {
+             @AuthenticationPrincipal Long customerId,  // 실제 운영용
+//            @RequestParam(required = false, defaultValue = "1") Long customerId,  // 테스트용
+            @RequestBody @Valid PrepaymentReserveRequest request) {
 
-        log.info("선결제 요청 수신 - 가게ID: {}, 사용자ID: {}, 금액: {}, orderId: {}, 멱등키: {}",
-                storeId, customerId, requestDto.getAmount(), requestDto.getOrderId(), idempotencyKey);
+        log.info("[예약] 요청 수신 - 가게ID: {}, 고객ID: {}, 금액: {}원",
+                storeId, customerId, request.getAmount());
 
-        IdempotentResult<PrepaymentResponseDto> result = prepaymentService.processPayment(storeId, customerId, idempotencyKey, requestDto);
-        
+        PrepaymentReserveResponse response = prepaymentService.reservePayment(storeId, customerId, request);
+
+        log.info("[예약] 응답 전송 - orderId: {}, 만료: {}", response.getOrderId(), response.getExpiresAt());
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("결제 예약이 생성되었습니다.", HttpStatus.CREATED.value(), response));
+    }
+
+    /**
+     * [2단계] 프론트엔드 - 토스 결제창 호출
+     * 성공하면 3단계로 호출
+     */
+
+    /**
+     * [3단계] 선결제 승인 (보안 강화)
+     * 예약된 금액과 비교하여 변조 방지 및 멱등성 보장
+     *
+     * @param storeId 가게 ID
+     * @param customerId 고객 ID (인증 정보)
+     * @param request 승인 요청 (paymentKey, orderId, amount)
+     * @return 결제 결과
+     */
+    @PostMapping("/{storeId}/prepayment/confirm")
+    public ResponseEntity<ApiResponse<PrepaymentResponseDto>> confirmPrepayment(
+            @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId,
+             @AuthenticationPrincipal Long customerId,  // 실제 운영용
+//            @RequestParam(required = false, defaultValue = "1") Long customerId,  // 테스트용
+            @RequestBody @Valid PrepaymentConfirmRequest request) {
+
+        log.info("[승인] 요청 수신 - 가게ID: {}, 고객ID: {}, orderId: {}, 금액: {}원",
+                storeId, customerId, request.getOrderId(), request.getAmount());
+
+        IdempotentResult<PrepaymentResponseDto> result = prepaymentService.confirmPayment(storeId, customerId, request);
+
         PrepaymentResponseDto responseDto = result.getBody();
         HttpStatus httpStatus = result.getHttpStatus();
-        
+
         String message;
         if (result.isReplay()) {
-            message = "이전에 처리된 선결제 결과를 반환합니다.";
-            log.info("선결제 재생 응답 - 거래ID: {}", responseDto.getTransactionId());
-        } else if (httpStatus == HttpStatus.ACCEPTED) {
-            message = "선결제 요청이 처리 중입니다. 잠시 후 다시 시도해주세요.";
-            log.info("선결제 처리 중 - Retry-After: {}초", result.getRetryAfterSeconds());
-            
-            ResponseEntity.BodyBuilder builder = ResponseEntity.status(httpStatus);
-            if (result.getRetryAfterSeconds() != null) {
-                builder.header("Retry-After", result.getRetryAfterSeconds().toString());
-            }
-            return builder.body(ApiResponse.success(message, httpStatus.value(), null));
+            message = "이전에 처리된 결제 결과를 반환합니다.";
+            log.info("[승인] 멱등성 재생 - 거래ID: {}", responseDto.getTransactionId());
         } else {
             message = "선결제가 성공적으로 완료되었습니다.";
-            log.info("선결제 처리 성공 - 거래ID: {}", responseDto.getTransactionId());
+            log.info("[승인] 처리 성공 - 거래ID: {}, 포인트: {}P",
+                    responseDto.getTransactionId(), responseDto.getTotalPoints());
         }
-        
+
         return ResponseEntity.status(httpStatus)
                 .body(ApiResponse.success(message, httpStatus.value(), responseDto));
     }

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>결제 성공</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>결제 처리 중...</h1>
+        <div id="loading">결제 승인 요청 중입니다.</div>
+        <div id="result" style="display:none;"></div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script>
+        // URL 파라미터 파싱
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentKey = urlParams.get('paymentKey');
+        const orderId = urlParams.get('orderId');
+        const amount = urlParams.get('amount');
+        const storeId = urlParams.get('storeId');
+
+        // 3단계: 승인 API 호출
+        async function confirmPayment() {
+            try {
+                const response = await fetch(
+                    `${API_BASE_URL}/api/v1/stores/${storeId}/prepayment/confirm?customerId=1`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },  // JWT 토큰 불필요
+                        body: JSON.stringify({
+                            paymentKey: paymentKey,
+                            orderId: orderId,
+                            amount: parseInt(amount)
+                        })
+                    }
+                );
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || '승인 실패');
+                }
+
+                const data = await response.json();
+                console.log('결제 승인 성공:', data);
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('result').style.display = 'block';
+                document.getElementById('result').innerHTML = `
+                    <h2>결제 성공!</h2>
+                    <p>거래 ID: ${data.data.transactionId}</p>
+                    <p>결제 금액: ${data.data.paymentAmount.toLocaleString()}원</p>
+                    <p>보너스: ${data.data.bonusAmount.toLocaleString()}원 (${data.data.bonusPercentage}%)</p>
+                    <p>총 포인트: ${data.data.totalPoints.toLocaleString()}P</p>
+                    <p>잔액: ${data.data.remainingBalance.toLocaleString()}P</p>
+                    <a href="/index.html" class="button">처음으로</a>
+                `;
+
+            } catch (error) {
+                console.error('결제 승인 오류:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('result').style.display = 'block';
+                document.getElementById('result').innerHTML = `
+                    <h2 class="error">결제 실패</h2>
+                    <p>${error.message}</p>
+                    <a href="/index.html" class="button">처음으로</a>
+                `;
+            }
+        }
+
+        // 페이지 로드 시 자동 실행
+        if (paymentKey && orderId && amount && storeId) {
+            confirmPayment();
+        } else {
+            document.getElementById('result').innerHTML = '<p class="error">잘못된 접근입니다.</p>';
+        }
+    </script>
+</body>
+</html>

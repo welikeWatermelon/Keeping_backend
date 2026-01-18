@@ -63,5 +63,7 @@ src/resources/keeping-firebase-adminsdk.json
 src/resources/firebase/keeping-firebase-adminsdk.json
 src/resources/application.yml
 
-### CLAUDE
+### Claude Code Files ###
+.claude/
 CLAUDE.md
+CLAUDE.local.md

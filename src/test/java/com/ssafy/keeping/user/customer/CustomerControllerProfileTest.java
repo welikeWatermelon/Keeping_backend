@@ -239,7 +239,7 @@ public class CustomerControllerProfileTest {
         // when & then
         mockMvc.perform(get("/customers/me/groups")
                         .with(SecurityMockMvcRequestPostProcessors.authentication(auth)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("내가 속한 그룹을 조회하였습니다."))
                 .andExpect(jsonPath("$.data.groupIds").isArray())
                 .andExpect(jsonPath("$.data.groupIds.length()").value(2));

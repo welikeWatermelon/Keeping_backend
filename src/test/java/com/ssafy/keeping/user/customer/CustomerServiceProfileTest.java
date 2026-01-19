@@ -6,14 +6,13 @@ import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileResponse;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
 import com.ssafy.keeping.domain.user.customer.service.CustomerService;
+import com.ssafy.keeping.support.MySqlTestContainerConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -23,12 +22,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @Transactional // 테스트 끝나면 자동 롤백(기본)
 @ActiveProfiles("test")
-public class CustomerServiceProfileTest {
+public class CustomerServiceProfileTest extends MySqlTestContainerConfig {
 
     @Autowired CustomerService customerService;
     @Autowired CustomerRepository customerRepository;
-
-    @MockBean ClientRegistrationRepository clientRegistrationRepository;
 
     @Test
     @DisplayName("내 프로필 조회 성공")

@@ -4,6 +4,7 @@ import com.ssafy.keeping.domain.auth.enums.AuthProvider;
 import com.ssafy.keeping.domain.auth.enums.Gender;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
+import com.ssafy.keeping.support.MySqlTestContainerConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -11,11 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 
 import org.springframework.test.context.ActiveProfiles;
@@ -35,12 +34,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 @ActiveProfiles("test")
-public class CustomerControllerProfileTest {
+public class CustomerControllerProfileTest extends MySqlTestContainerConfig {
 
     @Autowired MockMvc mockMvc;
     @Autowired CustomerRepository customerRepository;
-
-    @MockBean ClientRegistrationRepository clientRegistrationRepository;
 
     @Test
     @DisplayName("내 프로필 조회 성공 - /customers/me")
@@ -60,15 +57,14 @@ public class CustomerControllerProfileTest {
         Authentication auth =
                 new UsernamePasswordAuthenticationToken(
                         saved.getCustomerId(), // principal = customerId
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))
+                        null, // credentials
+                        List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER")) // authorities 권한 목록
                 );
 
         // when & then
         mockMvc.perform(get("/customers/me")
                         .with(SecurityMockMvcRequestPostProcessors.authentication(auth)))
                 .andExpect(status().isOk())
-                // ApiResponse 구조에 맞춰 jsonPath는 너 프로젝트 필드명으로 조정!
                 .andExpect(jsonPath("$.message").value("프로필 조회 성공"))
                 .andExpect(jsonPath("$.data.name").value(saved.getName()))
                 .andExpect(jsonPath("$.data.phoneNumber").value(saved.getPhoneNumber()))

@@ -57,7 +57,8 @@ public class SecurityConfig {
             "/ocr/*",
             "/customer/register/**",
             "/owners/register/**",
-            "/debug/redis"
+            "/debug/redis",
+            "/swagger-ui.html"
     };
 
     public static final String[] TEMP_ALLOW_URLS = {

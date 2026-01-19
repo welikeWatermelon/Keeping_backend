@@ -27,7 +27,6 @@ import java.util.Optional;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final WalletRepository walletRepository;
     private final ImageService imageService;
 
     /**
@@ -51,65 +50,6 @@ public class CustomerService {
                 .build();
 
         return customerRepository.save(customer);
-    }
-
-//    /**
-//     * OAuth 인증으로 고객 생성 (OTP 없이 즉시 등록)
-//     * - 카카오 정보만으로 Customer + Wallet 생성
-//     * - PIN은 나중에 설정 가능
-//     */
-//    @Transactional
-//    public Customer createCustomerFromOAuth(String providerId,
-//                                           AuthProvider provider,
-//                                           String email,
-//                                           String imgUrl,
-//                                           String nickname) {
-//        // 카카오 닉네임을 name으로 사용, 없으면 기본값
-//        String name = (nickname != null && !nickname.isEmpty()) ? nickname : "카카오 사용자";
-//
-//        // Customer 생성 (phone, birth, gender는 NULL)
-//        Customer customer = Customer.builder()
-//                .providerType(provider)
-//                .providerId(providerId)
-//                .email(email)
-//                .name(name)
-//                .imgUrl(imgUrl)
-//                .phoneNumber(null)
-//                .birth(null)
-//                .gender(null)
-//                .build();
-//
-//        try {
-//            customer = customerRepository.save(customer);
-//            log.info("OAuth로 고객 등록 완료 - customerId: {}, name: {}, email: {}",
-//                    customer.getCustomerId(), customer.getName(), customer.getEmail());
-//        } catch (DataIntegrityViolationException e) {
-//            log.error("OAuth 고객 등록 실패 - 중복 데이터", e);
-//            throw new CustomException(ErrorCode.BAD_REQUEST);
-//        }
-//
-//        // 지갑 생성 (balance는 기본값 0)
-//        Wallet wallet = Wallet.builder()
-//                .customer(customer)
-//                .walletType(WalletType.INDIVIDUAL)
-//                .build();
-//
-//        try {
-//            walletRepository.save(wallet);
-//            log.info("OAuth 고객 지갑 생성 완료 - customerId: {}", customer.getCustomerId());
-//        } catch (Exception e) {
-//            log.error("OAuth 고객 지갑 생성 실패", e);
-//            throw new CustomException(ErrorCode.BAD_REQUEST);
-//        }
-//
-//        // CustomerPinAuth는 나중에 사용자가 직접 설정하도록 생성하지 않음
-//
-//        return customer;
-//    }
-
-    public Customer validCustomer(Long customerId) {
-        return customerRepository.findByCustomerIdAndDeletedAtIsNull(customerId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 
     /**
@@ -172,5 +112,10 @@ public class CustomerService {
             log.error("고객 프로필 수정 실패 - 고객ID: {}", customerId, e);
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
+    }
+
+    public Customer validCustomer(Long customerId) {
+        return customerRepository.findByCustomerIdAndDeletedAtIsNull(customerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 }

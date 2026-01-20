@@ -65,6 +65,6 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<MyGroupsResponse>> myGroups(@AuthenticationPrincipal Long customerId) {
         List<Long> ids = groupMemberRepository.findGroupIdsByCustomerId(customerId);
         MyGroupsResponse data = MyGroupsResponse.of(ids);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("내가 속한 그룹을 조회하였습니다.", HttpStatus.CREATED.value(), data));
+        return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.success("내가 속한 그룹을 조회하였습니다.", HttpStatus.CREATED.value(), data));
     }
 }

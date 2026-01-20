@@ -73,6 +73,11 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	jvmArgs("-XX:+EnableDynamicAgentLoading")
+
+	maxHeapSize = "1024m"
+
+	maxParallelForks = 1
 }
 
 jar {

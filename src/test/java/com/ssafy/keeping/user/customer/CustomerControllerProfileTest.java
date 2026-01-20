@@ -10,6 +10,7 @@ import com.ssafy.keeping.domain.group.repository.GroupRepository;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileUpdateRequest;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
+import com.ssafy.keeping.support.MySqlTestContainerConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -17,12 +18,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 
 import org.springframework.test.context.ActiveProfiles;
@@ -43,21 +42,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 @ActiveProfiles("test")
-public class CustomerControllerProfileTest {
+public class CustomerControllerProfileTest extends MySqlTestContainerConfig {
 
-    @Autowired
-    MockMvc mockMvc;
-    @Autowired
-    ObjectMapper objectMapper;
-    @Autowired
-    CustomerRepository customerRepository;
-    @Autowired
-    GroupRepository groupRepository;
-    @Autowired
-    GroupMemberRepository groupMemberRepository;
-
-    @MockBean
-    ClientRegistrationRepository clientRegistrationRepository;
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
+    @Autowired CustomerRepository customerRepository;
+    @Autowired GroupRepository groupRepository;
+    @Autowired GroupMemberRepository groupMemberRepository;
 
     // ============ Helper Methods ============
 
@@ -255,7 +246,7 @@ public class CustomerControllerProfileTest {
         // when & then
         mockMvc.perform(get("/customers/me/groups")
                         .with(SecurityMockMvcRequestPostProcessors.authentication(auth)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("내가 속한 그룹을 조회하였습니다."))
                 .andExpect(jsonPath("$.data.groupIds").isArray())
                 .andExpect(jsonPath("$.data.groupIds.length()").value(0));

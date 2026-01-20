@@ -29,15 +29,14 @@ public class StoreStatisticsController {
     /**
      * 가게 전체 누적 통계 조회
      */
-    @PostMapping("/overall")
+    @GetMapping("/overall") // Post -> Get 으로 변경되었습니다!!!!!!!
     public ResponseEntity<ApiResponse<StoreOverallStatisticsResponseDto>> getOverallStatistics(
             @PathVariable Long storeId,
-            @AuthenticationPrincipal Long ownerId,
-            @RequestBody @Valid StatisticsRequestDto requestDto) {
+            @AuthenticationPrincipal Long ownerId) {
 
         log.info("전체 통계 조회 요청 - 가게ID: {}, 점주ID: {}", storeId, ownerId);
 
-        StoreOverallStatisticsResponseDto responseDto = storeStatisticsService.getOverallStatistics(storeId, ownerId, requestDto);
+        StoreOverallStatisticsResponseDto responseDto = storeStatisticsService.getOverallStatistics(storeId, ownerId);
 
         return ResponseEntity.ok()
                 .body(ApiResponse.success("가게 전체 통계가 조회되었습니다.", HttpStatus.OK.value(), responseDto));

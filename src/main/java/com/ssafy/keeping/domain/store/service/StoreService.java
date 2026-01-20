@@ -59,9 +59,8 @@ public class StoreService {
                 .address(requestDto.getAddress())
                 .phoneNumber(requestDto.getPhoneNumber())
                 .category(requestDto.getCategory())
-                .bankAccount(requestDto.getBankAccount())
                 .description(requestDto.getDescription())
-                .storeStatus(StoreStatus.ACTIVE)  // 바로 활성화 (승인 불필요)
+                .storeStatus(StoreStatus.ACTIVE)
                 .imgUrl(imgUrl)
                 .build();
 

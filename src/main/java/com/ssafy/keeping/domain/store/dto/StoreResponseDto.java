@@ -10,12 +10,11 @@ import java.time.LocalDateTime;
 @Builder
 @Getter
 public class StoreResponseDto {
-    // TODO: 추후 가게 주인으로서 조회하는 용으로 쓸때 사용 and bankAccount, taxId 등은 마스킹 필요
+
     private Long storeId;
     private String storeName;
     private String address;
     private String phoneNumber;
-    private Long merchantId;
     private String category;
     private StoreStatus storeStatus;
     private String description;
@@ -28,7 +27,6 @@ public class StoreResponseDto {
                 .storeName(store.getStoreName())
                 .address(store.getAddress())
                 .phoneNumber(store.getPhoneNumber())
-                .merchantId(store.getMerchantId())
                 .category(store.getCategory())
                 .createdAt(store.getCreatedAt())
                 .storeStatus(store.getStoreStatus())

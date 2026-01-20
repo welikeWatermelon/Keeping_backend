@@ -27,12 +27,4 @@ public class OwnerController {
         return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.success("성공적 변경", HttpStatus.OK.value(), response));
     }
 
-    /**
-     * 점주 포인트 조회
-     */
-    @GetMapping("/{ownerId}/points")
-    public ResponseEntity<ApiResponse<Long>> getOwnerPoints(@PathVariable Long ownerId) {
-        Long points = ownerService.getOwnerPoints(ownerId);
-        return ResponseEntity.ok(ApiResponse.success("포인트 조회 성공", HttpStatus.OK.value(), points));
-    }
 }

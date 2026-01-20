@@ -54,12 +54,6 @@ public class Store {
     @Column(name = "phone_number")
     private String phoneNumber;
 
-    @Column(name = "bank_account")
-    private String bankAccount;
-
-    @Column(name = "merchant_id")
-    private Long merchantId;  // 더 이상 외부 API로 생성하지 않음 (nullable)
-
     @Column(nullable = false)
     private String category;
 

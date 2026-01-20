@@ -52,8 +52,8 @@ public class SecurityConfig {
             "/favicon.ico",
             "/.well-known/**",
             "/s3/**",
-            "/owners/stores/**",
-            "/api/v1/stores/**",
+//            "/owners/stores/**", 인증필요
+//            "/api/v1/stores/**",
             "/ocr/*",
             "/customer/register/**",
             "/owners/register/**",

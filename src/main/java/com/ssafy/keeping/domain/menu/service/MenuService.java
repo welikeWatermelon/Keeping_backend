@@ -42,7 +42,7 @@ public class MenuService {
                 () -> new CustomException(ErrorCode.STORE_NOT_FOUND)
         );
 
-        return menuRepository.findAllMenusByStoreId(storeId);
+        return menuRepository.findActiveMenusByStoreId(storeId);
     }
 
     public List<MenuResponseDto> getAllMenusByCategory(Long categoryId) {

@@ -23,28 +23,43 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
 
     Optional<Menu> findByMenuIdAndStore_StoreId(Long menuId, Long storeId);
 
+    // 1. 손님용 (공개된 메뉴만 조회)
     @Query("""
-    select new com.ssafy.keeping.domain.menu.dto.MenuResponseDto(
-        m.menuId, m.store.storeId, m.menuName, m.category.categoryId,
-        m.category.categoryName, m.displayOrder, m.soldOut,
-        m.imgUrl, m.description, m.price
-    )
-    from Menu m
-    where m.store.storeId = :storeId
-        and m.active 
-        and m.deletedAt is null
+        select new com.ssafy.keeping.domain.menu.dto.MenuResponseDto(
+            m.menuId, m.store.storeId, m.menuName, m.category.categoryId,
+            m.category.categoryName, m.displayOrder, m.soldOut,
+            m.imgUrl, m.description, m.price
+        )
+        from Menu m
+        where m.store.storeId = :storeId
+          and m.active = true
+          and m.deletedAt is null
+    """)
+    List<MenuResponseDto> findActiveMenusByStoreId(@Param("storeId") Long storeId);
+
+    // 2. 사장님용 (비공개 포함 전체 조회)
+    @Query("""
+        select new com.ssafy.keeping.domain.menu.dto.MenuResponseDto(
+            m.menuId, m.store.storeId, m.menuName, m.category.categoryId,
+            m.category.categoryName, m.displayOrder, m.soldOut,
+            m.imgUrl, m.description, m.price
+        )
+        from Menu m
+        where m.store.storeId = :storeId
+          and m.deletedAt is null
     """)
     List<MenuResponseDto> findAllMenusByStoreId(@Param("storeId") Long storeId);
 
     @Query("""
     select new com.ssafy.keeping.domain.menu.dto.MenuResponseDto(
-        m.menuId, m.store.storeId, m.menuName, m.category.categoryId,
-        m.category.categoryName, m.displayOrder, m.soldOut,
-        m.imgUrl, m.description, m.price
+    m.menuId, m.store.storeId, m.menuName, m.category.categoryId,
+    m.category.categoryName, m.displayOrder, m.soldOut,
+    m.imgUrl, m.description, m.price
     )
     from Menu m
     where m.category.categoryId = :categoryId
-    and m.active and m.deletedAt is null
+    and m.active = true  
+    and m.deletedAt is null
     """)
     List<MenuResponseDto> findAllMenusByCategoryId(@Param("categoryId") Long categoryId);
 

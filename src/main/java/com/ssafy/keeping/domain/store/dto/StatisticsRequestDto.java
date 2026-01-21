@@ -1,7 +1,5 @@
 package com.ssafy.keeping.domain.store.dto;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,7 +12,6 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StatisticsRequestDto {
-
 
     private LocalDate date;
 

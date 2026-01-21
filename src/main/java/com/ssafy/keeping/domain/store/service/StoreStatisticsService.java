@@ -30,13 +30,13 @@ public class StoreStatisticsService {
     /**
      * 가게 전체 누적 통계 조회
      */
-    public StoreOverallStatisticsResponseDto getOverallStatistics(Long storeId, Long ownerId, StatisticsRequestDto requestDto) {
+    public StoreOverallStatisticsResponseDto getOverallStatistics(Long storeId, Long ownerId) {
         log.info("전체 통계 조회 시작 - 가게ID: {}, 점주ID: {}", storeId, ownerId);
 
         // 1. 가게 존재 및 권한 검증
         Store store = validateStoreOwnership(storeId, ownerId);
 
-        // 2. 통계 데이터 조회
+        // 2. 통계 데이터 조회 // todo: 여러번 DB를 조회하지 않고 한번에 가져와서 처리하는 방법이 있지 않을까..????!!!!!
         Long totalPaymentAmount = transactionRepository.getTotalPaymentAmountByStore(storeId); // 총 결제 금액 - 취소는 조회 안하게끔함
         Long totalChargePoints = transactionRepository.getTotalChargePointsByStore(storeId); // 총 충전 포인트 (보너스 포함)
         Long totalPointsUsed = transactionRepository.getTotalPointsUsedByStore(storeId); // point 총 사용량

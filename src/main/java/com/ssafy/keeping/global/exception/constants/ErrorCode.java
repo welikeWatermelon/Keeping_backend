@@ -32,7 +32,7 @@ public enum ErrorCode {
 
     // MenuCategory 관련
     MENU_CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 카테고리를 찾을 수 없습니다."),
-    DUPLICATE_RESOURCE(HttpStatus.BAD_REQUEST, "이미 존재하는 이름입니다."),
+    DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "이미 존재하는 이름입니다."),
     MENU_CATEGORY_HAS_CHILDREN(HttpStatus.BAD_REQUEST, "해당 대분류 카테고리에 속한 카테고리들이 존재합니다."),
 
     // 선결제/정산 관련
@@ -179,7 +179,7 @@ public enum ErrorCode {
     // 추가된 에러 코드들
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "유효하지 않은 요청입니다."),
     WALLET_BALANCE_NOT_FOUND(HttpStatus.NOT_FOUND, "지갑 잔액 정보를 찾을 수 없습니다."),
-    IMAGE_UPLOAD_ERROR(HttpStatus.BAD_REQUEST, "이미지 업로드에 실패했습니다"),
+    IMAGE_UPLOAD_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다"),
     IMAGE_UPDATE_ERROR(HttpStatus.BAD_REQUEST, "이미지 업데이트에 실패했습니다"),
 
     // 충전 보너스 관련

@@ -1,5 +1,7 @@
 package com.ssafy.keeping.domain.store.controller;
 
+import com.ssafy.keeping.domain.menu.repository.MenuRepository;
+import com.ssafy.keeping.domain.menuCategory.repository.MenuCategoryRepository;
 import com.ssafy.keeping.domain.store.constant.StoreStatus;
 import com.ssafy.keeping.domain.store.model.Store;
 import com.ssafy.keeping.domain.store.repository.StoreRepository;
@@ -37,6 +39,8 @@ class StoreControllerIT extends MySqlTestContainerConfig {
     @Autowired StoreRepository storeRepository;
     @Autowired OwnerRepository ownerRepository;
     @Autowired CustomerRepository customerRepository;
+    @Autowired MenuRepository menuRepository;
+    @Autowired MenuCategoryRepository menuCategoryRepository;
 
     Long activeStoreId;
     Long inactiveStoreId;
@@ -46,9 +50,11 @@ class StoreControllerIT extends MySqlTestContainerConfig {
 
     @BeforeEach
     void setUp() {
-        // FK 때문에 Store -> Owner 순으로 삭제하는 게 안전
-        storeRepository.deleteAll();
-        ownerRepository.deleteAll();
+        // FK 순서: menus -> categories -> stores -> owners
+        menuRepository.deleteAllInBatch();
+        menuCategoryRepository.deleteAllInBatch();
+        storeRepository.deleteAllInBatch();
+        ownerRepository.deleteAllInBatch();
 
         customer = customerRepository.save(CustomerFixtures.customer());
         owner = ownerRepository.save(OwnerFixtures.owner());

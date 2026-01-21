@@ -1,6 +1,8 @@
 package com.ssafy.keeping.domain.store.controller;
 
 import com.ssafy.keeping.domain.auth.enums.AuthProvider;
+import com.ssafy.keeping.domain.menu.repository.MenuRepository;
+import com.ssafy.keeping.domain.menuCategory.repository.MenuCategoryRepository;
 import com.ssafy.keeping.domain.store.constant.StoreStatus;
 import com.ssafy.keeping.domain.store.repository.StoreRepository;
 import com.ssafy.keeping.domain.user.owner.repository.OwnerRepository;
@@ -41,6 +43,8 @@ public class OwnerStoreControllerT extends MySqlTestContainerConfig {
     @Autowired MockMvc mockMvc;
     @Autowired StoreRepository storeRepository;
     @Autowired OwnerRepository ownerRepository;
+    @Autowired MenuRepository menuRepository;
+    @Autowired MenuCategoryRepository menuCategoryRepository;
 
     @MockBean ImageService imageService; // S3 대체
     @MockBean WalletStoreBalanceRepository balanceRepository; // 락/잔액 로직 대체
@@ -51,8 +55,10 @@ public class OwnerStoreControllerT extends MySqlTestContainerConfig {
 
     @BeforeEach
     void setUp() {
-        storeRepository.deleteAll();
-        ownerRepository.deleteAll();
+        menuRepository.deleteAllInBatch();
+        menuCategoryRepository.deleteAllInBatch();
+        storeRepository.deleteAllInBatch();
+        ownerRepository.deleteAllInBatch();
 
         var owner = ownerRepository.save(OwnerFixtures.owner(AuthProvider.KAKAO, "kakao_" + UUID.randomUUID(), "점주1"));
         ownerId = owner.getOwnerId();
@@ -142,7 +148,7 @@ public class OwnerStoreControllerT extends MySqlTestContainerConfig {
         mockMvc.perform(multipart("/owners/stores/{storeId}", storeId)
                         .file(newImg)
                         .param("storeName", "수정매장")
-                        .param("address", "서울시 강남구 새주소 99") // ⚠️ 기존 주소랑 다르게(현재 로직상 같으면 중복으로 터질 수 있음)
+                        .param("address", "서울시 강남구 새주소 99") // 기존 주소랑 다르게(현재 로직상 같으면 중복으로 터질 수 있음)
                         .param("phoneNumber", "010-9999-8888")
                         .with(owner(ownerId))
                         .with(req -> { req.setMethod("PATCH"); return req; })

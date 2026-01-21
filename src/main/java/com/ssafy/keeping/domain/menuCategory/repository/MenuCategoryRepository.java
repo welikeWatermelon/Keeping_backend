@@ -33,11 +33,12 @@ public interface MenuCategoryRepository extends JpaRepository<MenuCategory, Long
     List<MenuCategoryResponseDto> findAllMajorCategoryByStoreId(@Param("storeId") Long storeId);
 
     @Query("""
-    select (count(c) > 0) from MenuCategory c
-    where c.store.storeId = :storeId
-    and ( (:parentId is null and c.parent is null) or c.parent.categoryId = :parentId )
-    and lower(c.categoryName) = lower(:name)
-    and c.categoryId <> :categoryId
+    select (count(c) > 0) 
+      from MenuCategory c
+     where c.store.storeId = :storeId
+       and ( (:parentId is null and c.parent is null) or c.parent.categoryId = :parentId )
+       and lower(c.categoryName) = lower(:name)
+       and (:categoryId is null or c.categoryId <> :categoryId)
     """)
     boolean existsDuplicationName(@Param("storeId") Long storeId,
                           @Param("parentId") Long parentId,

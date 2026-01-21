@@ -2,6 +2,8 @@ package com.ssafy.keeping.domain.store.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.keeping.domain.auth.enums.AuthProvider;
+import com.ssafy.keeping.domain.menu.repository.MenuRepository;
+import com.ssafy.keeping.domain.menuCategory.repository.MenuCategoryRepository;
 import com.ssafy.keeping.domain.payment.transactions.model.Transaction;
 import com.ssafy.keeping.domain.payment.transactions.repository.TransactionRepository;
 import com.ssafy.keeping.domain.store.constant.StoreStatus;
@@ -55,6 +57,8 @@ class StoreStatisticsControllerT extends MySqlTestContainerConfig {
     @Autowired CustomerRepository customerRepository;
     @Autowired WalletRepository walletRepository;
     @Autowired TransactionRepository transactionRepository;
+    @Autowired MenuRepository menuRepository;
+    @Autowired MenuCategoryRepository menuCategoryRepository;
     @Autowired JdbcTemplate jdbcTemplate;
 
     Owner testOwner;
@@ -65,11 +69,13 @@ class StoreStatisticsControllerT extends MySqlTestContainerConfig {
 
     @BeforeEach
     void setUp() {
-        transactionRepository.deleteAll();
-        walletRepository.deleteAll();
-        storeRepository.deleteAll();
-        customerRepository.deleteAll();
-        ownerRepository.deleteAll();
+        transactionRepository.deleteAllInBatch();
+        walletRepository.deleteAllInBatch();
+        menuRepository.deleteAllInBatch();
+        menuCategoryRepository.deleteAllInBatch();
+        storeRepository.deleteAllInBatch();
+        customerRepository.deleteAllInBatch();
+        ownerRepository.deleteAllInBatch();
 
         testOwner = ownerRepository.save(OwnerFixtures.owner(AuthProvider.KAKAO, "kakao_" + UUID.randomUUID(), "테스트점주"));
         otherOwner = ownerRepository.save(OwnerFixtures.owner(AuthProvider.KAKAO, "kakao_" + UUID.randomUUID(), "다른점주"));

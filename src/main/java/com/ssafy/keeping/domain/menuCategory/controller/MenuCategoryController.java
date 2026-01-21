@@ -1,7 +1,5 @@
 package com.ssafy.keeping.domain.menuCategory.controller;
 
-import com.ssafy.keeping.domain.menuCategory.dto.MenuCategoryEditRequestDto;
-import com.ssafy.keeping.domain.menuCategory.dto.MenuCategoryRequestDto;
 import com.ssafy.keeping.domain.menuCategory.dto.MenuCategoryResponseDto;
 import com.ssafy.keeping.domain.menuCategory.service.MenuCategoryService;
 import com.ssafy.keeping.global.response.ApiResponse;

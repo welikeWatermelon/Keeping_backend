@@ -24,11 +24,15 @@ public final class MenuCategoryFixtures {
     }
 
     public static MenuCategory subCategory(Store store, MenuCategory parent, String categoryName) {
+        return subCategory(store, parent, categoryName, 0);
+    }
+
+    public static MenuCategory subCategory(Store store, MenuCategory parent, String categoryName, int displayOrder) {
         return MenuCategory.builder()
                 .store(store)
                 .parent(parent)
                 .categoryName(categoryName)
-                .displayOrder(0)
+                .displayOrder(displayOrder)
                 .build();
     }
 }

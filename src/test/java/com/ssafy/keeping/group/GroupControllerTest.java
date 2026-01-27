@@ -25,6 +25,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import com.ssafy.keeping.domain.auth.enums.UserRole;
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -74,8 +76,9 @@ public class GroupControllerTest extends MySqlTestContainerConfig {
     // ============ Helper Methods ============
 
     private Authentication createAuth(Long customerId) {
+        UserPrincipal principal = new UserPrincipal(customerId, UserRole.CUSTOMER);
         return new UsernamePasswordAuthenticationToken(
-                customerId, null,
+                principal, null,
                 List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))
         );
     }

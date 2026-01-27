@@ -74,8 +74,8 @@ public class PrepaymentService {
             Long customerId,
             PrepaymentReserveRequest request) {
 
-        log.info("[예약] 시작 - 가게ID: {}, 고객ID: {}, 금액: {}원",
-                storeId, customerId, request.getAmount());
+//        log.info("[예약] 시작 - 가게ID: {}, 고객ID: {}, 금액: {}원",
+//                storeId, customerId, request.getAmount());
 
         // 1. 고객 조회
         Customer customer = customerRepository.findById(customerId)
@@ -109,8 +109,8 @@ public class PrepaymentService {
 
         reservation = paymentReservationRepository.save(reservation);
 
-        log.info("[예약] 생성 완료 - 예약ID: {}, orderId: {}, 만료: {}",
-                reservation.getReservationId(), orderId, expiresAt);
+//        log.info("[예약] 생성 완료 - 예약ID: {}, orderId: {}, 만료: {}",
+//                reservation.getReservationId(), orderId, expiresAt);
 
         // 7. 응답 생성
         return PrepaymentReserveResponse.builder()
@@ -133,7 +133,7 @@ public class PrepaymentService {
             Long customerId,
             PrepaymentConfirmRequest request) {
 
-        log.info("[승인] 시작 - orderId: {}, 금액: {}원", request.getOrderId(), request.getAmount());
+//        log.info("[승인] 시작 - orderId: {}, 금액: {}원", request.getOrderId(), request.getAmount());
 
         // 1. 예약 조회 (비관적 락 - 동시성 제어)
         PaymentReservation reservation = paymentReservationRepository
@@ -142,29 +142,29 @@ public class PrepaymentService {
 
         // 2. 소유권 검증
         if (!reservation.getCustomer().getCustomerId().equals(customerId)) {
-            log.error("[승인] 권한 없음 - 예약 고객: {}, 요청 고객: {}",
-                    reservation.getCustomer().getCustomerId(), customerId);
+//            log.error("[승인] 권한 없음 - 예약 고객: {}, 요청 고객: {}",
+//                    reservation.getCustomer().getCustomerId(), customerId);
             throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         }
 
         // 3. 가게 검증
         if (!reservation.getStore().getStoreId().equals(storeId)) {
-            log.error("[승인] 가게 불일치 - 예약 가게: {}, 요청 가게: {}",
-                    reservation.getStore().getStoreId(), storeId);
+//            log.error("[승인] 가게 불일치 - 예약 가게: {}, 요청 가게: {}",
+//                    reservation.getStore().getStoreId(), storeId);
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
 
         // 4. 금액 검증 (핵심!)
         if (!reservation.getAmount().equals(request.getAmount())) {
-            log.error("[승인] 금액 변조 감지 - 예약 금액: {}, 요청 금액: {}",
-                    reservation.getAmount(), request.getAmount());
+//            log.error("[승인] 금액 변조 감지 - 예약 금액: {}, 요청 금액: {}",
+//                    reservation.getAmount(), request.getAmount());
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
 
         // 5. 만료 확인
         if (reservation.isExpired()) {
-            log.error("[승인] 예약 만료 - orderId: {}, 만료 시각: {}",
-                    request.getOrderId(), reservation.getExpiresAt());
+//            log.error("[승인] 예약 만료 - orderId: {}, 만료 시각: {}",
+//                    request.getOrderId(), reservation.getExpiresAt());
             reservation.markAsExpired();
             paymentReservationRepository.save(reservation);
             throw new CustomException(ErrorCode.INVALID_REQUEST);
@@ -172,8 +172,8 @@ public class PrepaymentService {
 
         // 6. 상태 확인 (멱등성)
         if (reservation.getStatus() == PaymentReservation.ReservationStatus.COMPLETED) {
-            log.info("[승인] 이미 처리됨 - orderId: {}, paymentKey: {}",
-                    request.getOrderId(), reservation.getPaymentKey());
+//            log.info("[승인] 이미 처리됨 - orderId: {}, paymentKey: {}",
+//                    request.getOrderId(), reservation.getPaymentKey());
 
             // 기존 거래 조회하여 반환
             Transaction existingTransaction = transactionRepository
@@ -225,21 +225,21 @@ public class PrepaymentService {
             tossResponse = tossPaymentClient.confirmPayment(tossRequest);
         } catch (Exception e) {
             // 토스 API 호출 실패
-            log.error("[승인] 토스 API 호출 실패", e);
+//            log.error("[승인] 토스 API 호출 실패", e);
             reservation.markAsFailed();
             paymentReservationRepository.save(reservation);
             throw e;
         }
 
         if (!tossResponse.isSuccess()) {
-            log.error("[승인] 토스 결제 실패 - code: {}, message: {}",
-                    tossResponse.getCode(), tossResponse.getMessage());
+//            log.error("[승인] 토스 결제 실패 - code: {}, message: {}",
+//                    tossResponse.getCode(), tossResponse.getMessage());
             reservation.markAsFailed();
             paymentReservationRepository.save(reservation);
             throw new CustomException(ErrorCode.PAYMENT_CONFIRM_FAILED);
         }
 
-        log.info("[승인] 토스 결제 성공 - paymentKey: {}", tossResponse.getPaymentKey());
+//        log.info("[승인] 토스 결제 성공 - paymentKey: {}", tossResponse.getPaymentKey());
 
         // 9. 포인트 적립 및 예약 완료 처리 (분산 트랜잭션 보상 처리)
         try {
@@ -255,22 +255,22 @@ public class PrepaymentService {
             reservation.markAsCompleted(request.getPaymentKey());
             paymentReservationRepository.save(reservation);
 
-            log.info("[승인] 완료 - 거래ID: {}, 적립포인트: {}P",
-                    response.getTransactionId(), paymentAmount);
+//            log.info("[승인] 완료 - 거래ID: {}, 적립포인트: {}P",
+//                    response.getTransactionId(), paymentAmount);
 
             return IdempotentResult.created(response);
 
         } catch (Exception e) {
             // 토스 결제는 성공했지만 DB 저장 실패 → 보상 트랜잭션 (자동 취소)
-            log.error("[승인] DB 저장 실패, 보상 트랜잭션 시작 - paymentKey: {}", request.getPaymentKey(), e);
+//            log.error("[승인] DB 저장 실패, 보상 트랜잭션 시작 - paymentKey: {}", request.getPaymentKey(), e);
 
             try {
                 compensatePayment(request.getPaymentKey(), "시스템 오류로 인한 자동 취소");
                 reservation.markAsFailed();
                 paymentReservationRepository.save(reservation);
             } catch (Exception compensateEx) {
-                log.error("[승인] 보상 트랜잭션 실패 - 수동 처리 필요! paymentKey: {}",
-                        request.getPaymentKey(), compensateEx);
+//                log.error("[승인] 보상 트랜잭션 실패 - 수동 처리 필요! paymentKey: {}",
+//                        request.getPaymentKey(), compensateEx);
                 // TODO: 알람 발송, 관리자 알림 등
             }
 
@@ -283,7 +283,7 @@ public class PrepaymentService {
      * 토스 결제는 성공했지만 DB 저장 실패 시 자동으로 취소
      */
     private void compensatePayment(String paymentKey, String cancelReason) {
-        log.warn("[보상] 토스 결제 취소 시작 - paymentKey: {}, 이유: {}", paymentKey, cancelReason);
+//        log.warn("[보상] 토스 결제 취소 시작 - paymentKey: {}, 이유: {}", paymentKey, cancelReason);
 
         TossCancelRequest tossCancelRequest = TossCancelRequest.builder()
                 .cancelReason(cancelReason)
@@ -292,10 +292,10 @@ public class PrepaymentService {
         TossCancelResponse cancelResponse = tossPaymentClient.cancelPayment(paymentKey, tossCancelRequest);
 
         if (cancelResponse.isSuccess()) {
-            log.info("[보상] 토스 결제 취소 성공 - paymentKey: {}", paymentKey);
+//            log.info("[보상] 토스 결제 취소 성공 - paymentKey: {}", paymentKey);
         } else {
-            log.error("[보상] 토스 결제 취소 실패 - paymentKey: {}, code: {}, message: {}",
-                    paymentKey, cancelResponse.getCode(), cancelResponse.getMessage());
+//            log.error("[보상] 토스 결제 취소 실패 - paymentKey: {}, code: {}, message: {}",
+//                    paymentKey, cancelResponse.getCode(), cancelResponse.getMessage());
             throw new CustomException(ErrorCode.PAYMENT_CANCEL_FAILED);
         }
     }
@@ -338,7 +338,7 @@ public class PrepaymentService {
         if (chargeBonusOpt.isPresent()) {
             bonusPercentage = chargeBonusOpt.get().getBonusPercentage();
             bonusAmount = (paymentAmount * bonusPercentage) / 100;
-            log.info("[보너스] 적용 - {}원 × {}% = {}원", paymentAmount, bonusPercentage, bonusAmount);
+//            log.info("[보너스] 적용 - {}원 × {}% = {}원", paymentAmount, bonusPercentage, bonusAmount);
         }
 
         long totalPoints = paymentAmount + bonusAmount;
@@ -381,8 +381,8 @@ public class PrepaymentService {
         balance.addBalance(totalPoints);
         walletStoreBalanceRepository.save(balance);
 
-        log.info("[선결제] 포인트 적립 완료 - 고객ID: {}, 결제금액: {}원, 보너스: {}원 ({}%), 총포인트: {}P",
-                wallet.getCustomer().getCustomerId(), paymentAmount, bonusAmount, bonusPercentage, totalPoints);
+//        log.info("[선결제] 포인트 적립 완료 - 고객ID: {}, 결제금액: {}원, 보너스: {}원 ({}%), 총포인트: {}P",
+//                wallet.getCustomer().getCustomerId(), paymentAmount, bonusAmount, bonusPercentage, totalPoints);
 
         // 5. 응답 생성
         return PrepaymentResponseDto.builder()

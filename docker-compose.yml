@@ -1,0 +1,32 @@
+services:
+  wiremock:
+    image: wiremock/wiremock:3.5.4
+    container_name: backend-wiremock-1
+    ports:
+      - "18080:8080"
+    volumes:
+      - ./wiremock:/home/wiremock
+    environment:
+      # 힙/GC: OOM 방지 + OOM 나면 바로 죽여서 재시작 되게(먹통 방지)
+      JAVA_TOOL_OPTIONS: >-
+        -Xms256m -Xmx1024m
+        -XX:+UseG1GC
+        -XX:+ExitOnOutOfMemoryError
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/home/wiremock/heapdump.hprof
+    command:
+      - --port=8080
+      - --global-response-templating
+      - --verbose
+
+      # Request journal 크기 제한 (OOM 방지)
+      - --max-request-journal-entries=1000
+
+      # 템플릿 캐시 제한 (3.7.0 이전은 기본 unlimited라 OOM 위험)
+      - --max-template-cache-entries=1000
+
+      # 부하 테스트 시 Jetty 스레드/async 튜닝
+      - --container-threads=50
+      - --async-response-enabled=true
+      - --async-response-threads=50
+    restart: unless-stopped

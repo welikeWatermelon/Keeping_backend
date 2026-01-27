@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.store.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.store.dto.StoreEditRequestDto;
 import com.ssafy.keeping.domain.store.dto.StorePublicDto;
 import com.ssafy.keeping.domain.store.dto.StoreRequestDto;
@@ -27,9 +28,10 @@ public class OwnerStoreController {
      * */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<StoreResponseDto>> createStore(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @ModelAttribute StoreRequestDto requestDto
     ) {
+        Long ownerId = principal.id();
         StoreResponseDto dto = storeService.createStore(ownerId, requestDto);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("매장이 등록되었습니다", HttpStatus.CREATED.value(), dto));
     }
@@ -39,10 +41,11 @@ public class OwnerStoreController {
      * */
     @PatchMapping(value = "/{storeId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<StoreResponseDto>> editStore(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long storeId,
             @Valid @ModelAttribute StoreEditRequestDto requestDto
     ) {
+        Long ownerId = principal.id();
         StoreResponseDto dto = storeService.editStore(storeId, ownerId, requestDto);
         return ResponseEntity.ok(ApiResponse.success("매장이 수정되었습니다", HttpStatus.OK.value(), dto));
     }
@@ -52,9 +55,10 @@ public class OwnerStoreController {
      * */
     @DeleteMapping("/{storeId}")
     public ResponseEntity<ApiResponse<StoreResponseDto>> deleteStore(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long storeId
     ) {
+        Long ownerId = principal.id();
         return ResponseEntity.ok(ApiResponse.success("매장이 삭제되었습니다", HttpStatus.OK.value(),
                 storeService.deleteStore(storeId, ownerId)));
     }
@@ -64,8 +68,9 @@ public class OwnerStoreController {
      * */
     @GetMapping
     public ResponseEntity<ApiResponse<List<StoreResponseDto>>> getMyStores(
-            @AuthenticationPrincipal Long ownerId
+            @AuthenticationPrincipal UserPrincipal principal
     ) {
+        Long ownerId = principal.id();
         List<StoreResponseDto> stores = storeService.getMyStores(ownerId);
         return ResponseEntity.ok(ApiResponse.success("내 매장 목록이 조회되었습니다.", HttpStatus.OK.value(), stores));
     }

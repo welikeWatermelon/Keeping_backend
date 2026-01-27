@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import com.ssafy.keeping.domain.auth.enums.UserRole;
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -94,9 +96,10 @@ public class StoreChargeBonusControllerTest extends MySqlTestContainerConfig {
 
     // ============ Helper Methods ============
 
-    private Authentication createAuth(Long onwerId) {
+    private Authentication createAuth(Long ownerId) {
+        UserPrincipal principal = new UserPrincipal(ownerId, UserRole.OWNER);
         return new UsernamePasswordAuthenticationToken(
-                onwerId, null,
+                principal, null,
                 List.of(new SimpleGrantedAuthority("ROLE_OWNER"))
         );
     }

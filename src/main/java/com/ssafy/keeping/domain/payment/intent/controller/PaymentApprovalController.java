@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.payment.intent.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.idempotency.model.IdempotentResult;
 import com.ssafy.keeping.domain.payment.intent.dto.ApproveRequest;
 import com.ssafy.keeping.domain.payment.intent.dto.PaymentIntentDetailResponse;
@@ -28,9 +29,10 @@ public class PaymentApprovalController {
     public ResponseEntity<ApiResponse<PaymentIntentDetailResponse>> approve(
             @PathVariable("intentId")UUID intentId,
             @RequestHeader("Idempotency-Key") String idemKey,
-            @AuthenticationPrincipal Long customerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody ApproveRequest body
     ) {
+        Long customerId = principal.id();
 
         if (idemKey == null || idemKey.isBlank()) {
             throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);

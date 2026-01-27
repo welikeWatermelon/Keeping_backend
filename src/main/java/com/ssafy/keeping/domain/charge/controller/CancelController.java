@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.charge.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.charge.dto.request.CancelRequestDto;
 import com.ssafy.keeping.domain.charge.dto.response.CancelListResponseDto;
 import com.ssafy.keeping.domain.charge.dto.response.CancelResponseDto;
@@ -31,15 +32,16 @@ public class CancelController {
 
     /**
      * 취소 가능한 거래 목록 조회 (페이지네이션)
-     * 
-     * @param customerId 고객 ID
+     * @param principal
      * @param pageable 페이지네이션 정보 (기본: page=0, size=10, sort=createdAt,desc)
      * @return 취소 가능한 거래 목록
      */
     @GetMapping("/cancel-list")
     public ResponseEntity<ApiResponse<Page<CancelListResponseDto>>> getCancelableTransactions(
-            @AuthenticationPrincipal Long customerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        Long customerId = principal.id();
 
         log.info("취소 가능한 거래 목록 조회 요청 - 고객ID: {}, 페이지: {}, 크기: {}",
                 customerId, pageable.getPageNumber(), pageable.getPageSize());
@@ -67,8 +69,10 @@ public class CancelController {
      */
     @PostMapping("/payments/cancel")
     public ResponseEntity<ApiResponse<CancelResponseDto>> cancelPayment(
-            @AuthenticationPrincipal Long customerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody @Valid CancelRequestDto cancelRequestDto) {
+
+        Long customerId = principal.id();
 
         String identifier = cancelRequestDto.getPaymentKey() != null
                 ? cancelRequestDto.getPaymentKey()

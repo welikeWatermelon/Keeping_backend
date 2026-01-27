@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.favorite.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.favorite.dto.StoreFavoriteCountResponseDto;
 import com.ssafy.keeping.domain.favorite.service.StoreFavoriteService;
 import com.ssafy.keeping.global.response.ApiResponse;
@@ -21,9 +22,10 @@ public class OwnerFavoriteController {
      */
     @GetMapping("/stores/{storeId}/count")
     public ResponseEntity<ApiResponse<StoreFavoriteCountResponseDto>> getStoreFavoriteCount(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long storeId
     ) {
+        Long ownerId = principal.id();
         StoreFavoriteCountResponseDto dto = storeFavoriteService.getStoreFavoriteCount(ownerId, storeId);
         return ResponseEntity.ok(ApiResponse.success("가게 찜 개수 조회에 성공했습니다.", HttpStatus.OK.value(), dto));
     }

@@ -57,10 +57,6 @@ public class Owner {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @CreationTimestamp
-    @Column(name = "phone_verified_at")
-    private LocalDateTime phoneVerifiedAt;
-
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 

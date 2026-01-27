@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.favorite.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.favorite.dto.FavoriteCheckResponseDto;
 import com.ssafy.keeping.domain.favorite.dto.FavoriteToggleResponseDto;
 import com.ssafy.keeping.domain.favorite.dto.StoreFavoriteResponseDto;
@@ -25,9 +26,10 @@ public class StoreFavoriteController {
      */
     @PostMapping("/stores/{storeId}")
     public ResponseEntity<ApiResponse<FavoriteToggleResponseDto>> toggleFavorite(
-            @AuthenticationPrincipal Long customerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long storeId
     ) {
+        Long customerId = principal.id();
         FavoriteToggleResponseDto dto = storeFavoriteService.toggleFavorite(customerId, storeId);
         String message = dto.isFavorited() ? "찜 추가에 성공했습니다." : "찜 취소에 성공했습니다.";
         return ResponseEntity.ok(ApiResponse.success(message, HttpStatus.OK.value(), dto));
@@ -38,10 +40,11 @@ public class StoreFavoriteController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<StoreFavoriteResponseDto>> getFavoriteStores(
-            @AuthenticationPrincipal Long customerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
+        Long customerId = principal.id();
         Pageable pageable = PageRequest.of(page, size);
         StoreFavoriteResponseDto dto = storeFavoriteService.getFavoriteStores(customerId, pageable);
         return ResponseEntity.ok(ApiResponse.success("찜 목록 조회에 성공했습니다.", HttpStatus.OK.value(), dto));
@@ -52,9 +55,10 @@ public class StoreFavoriteController {
      */
     @GetMapping("/stores/{storeId}/check")
     public ResponseEntity<ApiResponse<FavoriteCheckResponseDto>> checkFavoriteStatus(
-            @AuthenticationPrincipal Long customerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long storeId
     ) {
+        Long customerId = principal.id();
         FavoriteCheckResponseDto dto = storeFavoriteService.checkFavoriteStatus(customerId, storeId);
         return ResponseEntity.ok(ApiResponse.success("찜 상태 확인에 성공했습니다.", HttpStatus.OK.value(), dto));
     }

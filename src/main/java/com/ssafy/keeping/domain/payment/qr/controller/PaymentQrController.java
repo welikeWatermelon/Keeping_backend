@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.payment.qr.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.payment.qr.dto.QrCreateRequest;
 import com.ssafy.keeping.domain.payment.qr.dto.QrCreateResponse;
 import com.ssafy.keeping.domain.payment.qr.service.QrTokenService;
@@ -23,10 +24,10 @@ public class PaymentQrController {
 
     @PostMapping("/new")
     public ResponseEntity<ApiResponse<QrCreateResponse>> create(
-            //@AuthenticationPrincipal Customer customer,
-            @AuthenticationPrincipal Long customerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody QrCreateRequest req
             ) {
+        Long customerId = principal.id();
         QrCreateResponse data = qrTokenService.create(customerId, req);
         return ResponseEntity
                 .status(HttpStatus.CREATED)

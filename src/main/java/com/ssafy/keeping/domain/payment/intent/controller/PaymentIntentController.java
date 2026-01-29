@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.payment.intent.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.idempotency.model.IdempotentResult;
 import com.ssafy.keeping.domain.payment.intent.dto.PaymentInitiateRequest;
 import com.ssafy.keeping.domain.payment.intent.dto.PaymentIntentDetailResponse;
@@ -30,10 +31,10 @@ public class PaymentIntentController {
     public ResponseEntity<ApiResponse<PaymentIntentDetailResponse>> initiate(
             @PathVariable UUID qrTokenId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKeyHeader,
-            // @AuthenticationPrincipal Owner owner,
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody PaymentInitiateRequest body
     ) {
+        Long ownerId = principal.id();
         IdempotentResult<PaymentIntentDetailResponse> res = paymentIntentService.initiate(qrTokenId, idempotencyKeyHeader, ownerId, body);
         return ResponseEntity
                 .status(res.getHttpStatus())

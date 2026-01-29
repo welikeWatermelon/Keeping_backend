@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.user.customer.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.group.repository.GroupMemberRepository;
 import com.ssafy.keeping.domain.user.customer.dto.MyGroupsResponse;
 import com.ssafy.keeping.domain.user.customer.dto.CustomerProfileResponse;
@@ -42,7 +43,8 @@ public class CustomerController {
      * 내 프로필 조회
      */
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<CustomerProfileResponse>> getMyProfile(@AuthenticationPrincipal Long customerId) {
+    public ResponseEntity<ApiResponse<CustomerProfileResponse>> getMyProfile(@AuthenticationPrincipal UserPrincipal principal) {
+        Long customerId = principal.id();
         CustomerProfileResponse response = customerService.getMyProfile(customerId);
         return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.success("프로필 조회 성공", HttpStatus.OK.value(), response));
     }
@@ -52,8 +54,9 @@ public class CustomerController {
      */
     @PutMapping("/me")
     public ResponseEntity<ApiResponse<CustomerProfileResponse>> updateMyProfile(
-            @AuthenticationPrincipal Long customerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CustomerProfileUpdateRequest request) {
+        Long customerId = principal.id();
         CustomerProfileResponse response = customerService.updateMyProfile(customerId, request);
         return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.success("프로필 수정 성공", HttpStatus.OK.value(), response));
     }
@@ -62,7 +65,8 @@ public class CustomerController {
      * 내가 속한 그룹 조회
      */
     @GetMapping("/me/groups")
-    public ResponseEntity<ApiResponse<MyGroupsResponse>> myGroups(@AuthenticationPrincipal Long customerId) {
+    public ResponseEntity<ApiResponse<MyGroupsResponse>> myGroups(@AuthenticationPrincipal UserPrincipal principal) {
+        Long customerId = principal.id();
         List<Long> ids = groupMemberRepository.findGroupIdsByCustomerId(customerId);
         MyGroupsResponse data = MyGroupsResponse.of(ids);
         return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.success("내가 속한 그룹을 조회하였습니다.", HttpStatus.CREATED.value(), data));

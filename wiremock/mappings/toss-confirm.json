@@ -1,0 +1,21 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/payments/confirm"
+  },
+  "response": {
+    "status": 200,
+    "fixedDelayMilliseconds": 0,
+    "headers": { "Content-Type": "application/json" },
+    "transformers": ["response-template"],
+    "jsonBody": {
+      "paymentKey": "{{jsonPath request.body '$.paymentKey'}}",
+      "orderId": "{{jsonPath request.body '$.orderId'}}",
+      "status": "DONE",
+      "totalAmount": "{{jsonPath request.body '$.amount'}}",
+      "requestedAt": "2026-01-26T00:00:00+09:00",
+      "approvedAt": "2026-01-26T00:00:01+09:00"
+    }
+  }
+}

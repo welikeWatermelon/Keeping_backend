@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.menuCategory.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.menuCategory.dto.MenuCategoryEditRequestDto;
 import com.ssafy.keeping.domain.menuCategory.dto.MenuCategoryRequestDto;
 import com.ssafy.keeping.domain.menuCategory.dto.MenuCategoryResponseDto;
@@ -24,10 +25,11 @@ public class OwnerMenuCategoryController {
      * */
     @PostMapping()
     public ResponseEntity<ApiResponse<MenuCategoryResponseDto>> createMenuCategory(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long storeId,
             @RequestBody MenuCategoryRequestDto requestDto
     ) {
+        Long ownerId = principal.id();
         MenuCategoryResponseDto dto = menuCategoryService.createMenuCategory(ownerId, storeId, requestDto);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("메뉴 카테고리가 등록되었습니다", HttpStatus.CREATED.value(), dto));
     }
@@ -50,11 +52,12 @@ public class OwnerMenuCategoryController {
      * */
     @PatchMapping("/{categoryId}")
     public ResponseEntity<ApiResponse<MenuCategoryResponseDto>> editMenuCategory(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long storeId,
             @PathVariable Long categoryId,
             @RequestBody MenuCategoryEditRequestDto requestDto
     ) {
+        Long ownerId = principal.id();
         MenuCategoryResponseDto dto = menuCategoryService.editMenuCategory(ownerId, storeId, categoryId, requestDto);
         return ResponseEntity.ok(ApiResponse.success("메뉴 카테고리가 수정되었습니다", HttpStatus.OK.value(), dto));
     }
@@ -64,10 +67,11 @@ public class OwnerMenuCategoryController {
      * */
     @DeleteMapping("{categoryId}")
     public ResponseEntity<ApiResponse<Void>> deleteMenuCategory(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long storeId,
             @PathVariable Long categoryId
     ) {
+        Long ownerId = principal.id();
         menuCategoryService.deleteMenuCategory(ownerId, storeId, categoryId);
         return ResponseEntity.ok(ApiResponse.success("메뉴 카테고리가 삭제되었습니다", HttpStatus.OK.value(), null));
     }

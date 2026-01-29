@@ -39,8 +39,8 @@ public class TossPaymentClient {
     public TossPaymentConfirmResponse confirmPayment(TossPaymentConfirmRequest request) {
         String url = config.getBaseUrl() + "/v1/payments/confirm";
 
-        log.info("[토스] 결제 승인 요청 - paymentKey: {}, orderId: {}, amount: {}",
-                request.getPaymentKey(), request.getOrderId(), request.getAmount());
+//        log.info("[토스] 결제 승인 요청 - paymentKey: {}, orderId: {}, amount: {}",
+//                request.getPaymentKey(), request.getOrderId(), request.getAmount());
 
         try {
             HttpEntity<TossPaymentConfirmRequest> entity = new HttpEntity<>(request, createHeaders());
@@ -55,22 +55,22 @@ public class TossPaymentClient {
             TossPaymentConfirmResponse body = response.getBody();
 
             if (body != null && body.isSuccess()) {
-                log.info("[토스] 결제 승인 성공 - paymentKey: {}, status: {}",
-                        body.getPaymentKey(), body.getStatus());
+//                log.info("[토스] 결제 승인 성공 - paymentKey: {}, status: {}",
+//                        body.getPaymentKey(), body.getStatus());
             } else {
-                log.warn("[토스] 결제 승인 실패 - code: {}, message: {}",
-                        body != null ? body.getCode() : "unknown",
-                        body != null ? body.getMessage() : "unknown");
+//                log.warn("[토스] 결제 승인 실패 - code: {}, message: {}",
+//                        body != null ? body.getCode() : "unknown",
+//                        body != null ? body.getMessage() : "unknown");
             }
 
             return body;
 
         } catch (HttpClientErrorException e) {
-            log.error("[토스] 결제 승인 API 오류 - status: {}, body: {}",
-                    e.getStatusCode(), e.getResponseBodyAsString());
+//            log.error("[토스] 결제 승인 API 오류 - status: {}, body: {}",
+//                    e.getStatusCode(), e.getResponseBodyAsString());
             throw new CustomException(ErrorCode.PAYMENT_CONFIRM_FAILED);
         } catch (Exception e) {
-            log.error("[토스] 결제 승인 중 예외 발생", e);
+//            log.error("[토스] 결제 승인 중 예외 발생", e);
             throw new CustomException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }
@@ -82,8 +82,8 @@ public class TossPaymentClient {
     public TossCancelResponse cancelPayment(String paymentKey, TossCancelRequest request) {
         String url = config.getBaseUrl() + "/v1/payments/" + paymentKey + "/cancel";
 
-        log.info("[토스] 결제 취소 요청 - paymentKey: {}, cancelReason: {}, cancelAmount: {}",
-                paymentKey, request.getCancelReason(), request.getCancelAmount());
+//        log.info("[토스] 결제 취소 요청 - paymentKey: {}, cancelReason: {}, cancelAmount: {}",
+//                paymentKey, request.getCancelReason(), request.getCancelAmount());
 
         try {
             HttpEntity<TossCancelRequest> entity = new HttpEntity<>(request, createHeaders());
@@ -98,22 +98,22 @@ public class TossPaymentClient {
             TossCancelResponse body = response.getBody();
 
             if (body != null && body.isSuccess()) {
-                log.info("[토스] 결제 취소 성공 - paymentKey: {}, status: {}",
-                        body.getPaymentKey(), body.getStatus());
+//                log.info("[토스] 결제 취소 성공 - paymentKey: {}, status: {}",
+//                        body.getPaymentKey(), body.getStatus());
             } else {
-                log.warn("[토스] 결제 취소 실패 - code: {}, message: {}",
-                        body != null ? body.getCode() : "unknown",
-                        body != null ? body.getMessage() : "unknown");
+//                log.warn("[토스] 결제 취소 실패 - code: {}, message: {}",
+//                        body != null ? body.getCode() : "unknown",
+//                        body != null ? body.getMessage() : "unknown");
             }
 
             return body;
 
         } catch (HttpClientErrorException e) {
-            log.error("[토스] 결제 취소 API 오류 - status: {}, body: {}",
-                    e.getStatusCode(), e.getResponseBodyAsString());
+//            log.error("[토스] 결제 취소 API 오류 - status: {}, body: {}",
+//                    e.getStatusCode(), e.getResponseBodyAsString());
             throw new CustomException(ErrorCode.PAYMENT_CANCEL_FAILED);
         } catch (Exception e) {
-            log.error("[토스] 결제 취소 중 예외 발생", e);
+//            log.error("[토스] 결제 취소 중 예외 발생", e);
             throw new CustomException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }

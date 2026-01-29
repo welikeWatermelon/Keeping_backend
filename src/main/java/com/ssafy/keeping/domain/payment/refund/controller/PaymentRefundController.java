@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.payment.refund.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.idempotency.model.IdempotentResult;
 import com.ssafy.keeping.domain.payment.refund.dto.RefundResponse;
 import com.ssafy.keeping.domain.payment.refund.service.PaymentRefundService;
@@ -38,8 +39,9 @@ public class PaymentRefundController {
             @PathVariable Long storeId,
             @PathVariable Long transactionId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            @AuthenticationPrincipal Long ownerId
+            @AuthenticationPrincipal UserPrincipal principal
     ) {
+        Long ownerId = principal.id();
         // 0) 멱등키 필수
         if (!StringUtils.hasText(idempotencyKey)) {
             throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);

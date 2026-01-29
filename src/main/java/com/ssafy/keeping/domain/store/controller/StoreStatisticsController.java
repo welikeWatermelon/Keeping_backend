@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.store.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.store.dto.DailyStatisticsResponseDto;
 import com.ssafy.keeping.domain.store.dto.MonthlyStatisticsResponseDto;
 import com.ssafy.keeping.domain.store.dto.PeriodStatisticsResponseDto;
@@ -32,7 +33,8 @@ public class StoreStatisticsController {
     @GetMapping("/overall") // Post -> Get 으로 변경되었습니다!!!!!!!
     public ResponseEntity<ApiResponse<StoreOverallStatisticsResponseDto>> getOverallStatistics(
             @PathVariable Long storeId,
-            @AuthenticationPrincipal Long ownerId) {
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Long ownerId = principal.id();
 
         log.info("전체 통계 조회 요청 - 가게ID: {}, 점주ID: {}", storeId, ownerId);
 
@@ -48,8 +50,9 @@ public class StoreStatisticsController {
     @PostMapping("/daily")
     public ResponseEntity<ApiResponse<DailyStatisticsResponseDto>> getDailyStatistics(
             @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId,
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody @Valid StatisticsRequestDto requestDto) {
+        Long ownerId = principal.id();
 
         log.info("일별 통계 조회 요청 - 가게ID: {}, 점주ID: {}, 날짜: {}",
                 storeId, ownerId, requestDto.getDate());
@@ -66,8 +69,9 @@ public class StoreStatisticsController {
     @PostMapping("/period")
     public ResponseEntity<ApiResponse<PeriodStatisticsResponseDto>> getPeriodStatistics(
             @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId,
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody @Valid StatisticsRequestDto requestDto) {
+        Long ownerId = principal.id();
 
         log.info("기간별 통계 조회 요청 - 가게ID: {}, 점주ID: {}, 기간: {} ~ {}",
                 storeId, ownerId, requestDto.getStartDate(), requestDto.getEndDate());
@@ -84,8 +88,9 @@ public class StoreStatisticsController {
     @PostMapping("/monthly")
     public ResponseEntity<ApiResponse<MonthlyStatisticsResponseDto>> getMonthlyStatistics(
             @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId,
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody @Valid StatisticsRequestDto requestDto) {
+        Long ownerId = principal.id();
 
         log.info("월별 통계 조회 요청 - 가게ID: {}, 점주ID: {}, 날짜: {}",
                 storeId, ownerId, requestDto.getDate());

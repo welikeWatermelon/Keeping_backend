@@ -3,9 +3,10 @@ package com.ssafy.keeping.domain.auth.security.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.keeping.domain.auth.handler.OAuth2SuccessHandler;
 import com.ssafy.keeping.domain.auth.security.JwtAccessDeniedHandler;
+import com.ssafy.keeping.domain.auth.security.JwtAuthenticationEntryPoint;
 import com.ssafy.keeping.domain.auth.security.filter.JwtAuthenticationFilter;
 import com.ssafy.keeping.domain.auth.security.filter.NoStoreAuthResponseFilter;
-import com.ssafy.keeping.domain.auth.security.JwtAuthenticationEntryPoint;
+import com.ssafy.keeping.domain.auth.security.filter.TestHeaderAuthenticationFilter;
 import com.ssafy.keeping.domain.auth.token.AccessTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,11 +25,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-@Profile("!perf")
+@Profile("perf") // perf에서만 적용
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
-public class SecurityConfig {
+public class SecurityConfigPerf {
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
@@ -36,30 +37,9 @@ public class SecurityConfig {
     @Value("${fe.base-url}")
     private String feBaseUrl;
 
-    public static final String[] ALLOW_URLS = {
-            "/auth/refresh",
-            "/auth/logout",
-            "/signup/**",
-
-            // todo: 아래 경로들이 인증이 필요 없는 부분인지 확인하기
-            "/login/**",
-            "/oauth2/**",
-            "/error",
-            "/actuator/health",
-            "/swagger-ui/**",
-            "/v3/api-docs/**",
-            "/swagger-resources/**",
-            "/favicon.ico",
-            "/.well-known/**",
-            "/s3/**",
-            "/ocr/*",
-            "/debug/redis",
-            "/swagger-ui.html"
-    };
-
-    public static final String[] TEMP_ALLOW_URLS = {
-
-    };
+    // 기존 SecurityConfig의 ALLOW_URLS / TEMP_ALLOW_URLS 그대로 가져와도 됨
+    public static final String[] ALLOW_URLS = SecurityConfig.ALLOW_URLS;
+    public static final String[] TEMP_ALLOW_URLS = SecurityConfig.TEMP_ALLOW_URLS;
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(
@@ -74,15 +54,20 @@ public class SecurityConfig {
         return new NoStoreAuthResponseFilter();
     }
 
+    // perf에서만 사용할 “테스트 헤더 인증 필터”
+    @Bean
+    public TestHeaderAuthenticationFilter testHeaderAuthenticationFilter() {
+        return new TestHeaderAuthenticationFilter();
+    }
+
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(feBaseUrl)); // 프론트 도메인 (Origin이 여러개인 경우... CORS가 깨질 수 있음... -> 여러개 등록하거나 yml에서 배열로 관리)
+        config.setAllowedOrigins(List.of(feBaseUrl));
         config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true); // 쿠키 포함 허용
+        config.setAllowCredentials(true);
         config.setMaxAge(3600L);
-//        config.setExposedHeaders(Arrays.asList("Authorization", "X-Total-Count")); // 프론트에서 Authorization 헤더를 응답에서 읽어야 하면 필요.
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
@@ -94,7 +79,8 @@ public class SecurityConfig {
             HttpSecurity http,
             OAuth2SuccessHandler successHandler,
             JwtAuthenticationFilter jwtFilter,
-            NoStoreAuthResponseFilter noStoreFilter
+            NoStoreAuthResponseFilter noStoreFilter,
+            TestHeaderAuthenticationFilter testHeaderFilter
     ) throws Exception {
 
         http
@@ -104,29 +90,27 @@ public class SecurityConfig {
                 .httpBasic(h -> h.disable())
                 .formLogin(f -> f.disable())
                 .exceptionHandling(eh -> eh
-                        .authenticationEntryPoint(jwtAuthenticationEntryPoint) // 인증 실패(401)
-                        .accessDeniedHandler(jwtAccessDeniedHandler) // 권한 부족(403)
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                        .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(ALLOW_URLS).permitAll()
-                        .requestMatchers(TEMP_ALLOW_URLS).permitAll() // 임시용
+                        .requestMatchers(TEMP_ALLOW_URLS).permitAll()
 
-                        // 역할 기반 인가 테스트
-                        // .hasRole() 인증도 필요하고, 권한(Authority)에 ROLE_{}이 있어야 통과
+                        // 역할 기반 인가 규칙도 그대로 유지
                         .requestMatchers("/customers/**").hasRole("CUSTOMER")
                         .requestMatchers("/owners/**").hasRole("OWNER")
-                        .requestMatchers("/cpqr/new").hasRole("CUSTOMER")
-                        .requestMatchers("/cpqr/*/initiate").hasRole("OWNER")
-                        .requestMatchers("/payments/*/approve").hasRole("CUSTOMER")
-                        .requestMatchers("/stores/*/transactions/*/refund").hasRole("OWNER")
 
-                        .anyRequest().authenticated() // 위에서 따로 허용해주지 않은 나머지 모든 요청은 “인증 필요”
+                        // prepayment는 authenticated 유지 (테스트 헤더로 인증 통과)
+                        .requestMatchers("/api/v1/stores/*/prepayment/**").hasRole("CUSTOMER")
+
+                        .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 .addFilterBefore(noStoreFilter, SecurityContextHolderFilter.class)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(testHeaderFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
-
 }

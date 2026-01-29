@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.charge.controller;
 
+import com.ssafy.keeping.domain.auth.security.principal.UserPrincipal;
 import com.ssafy.keeping.domain.charge.dto.request.ChargeBonusRequestDto;
 import com.ssafy.keeping.domain.charge.dto.response.ChargeBonusListResponseDto;
 import com.ssafy.keeping.domain.charge.dto.response.ChargeBonusResponseDto;
@@ -31,9 +32,10 @@ public class ChargeBonusController {
      */
     @PostMapping
     public ResponseEntity<ApiResponse<ChargeBonusResponseDto>> createChargeBonus(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId,
             @RequestBody @Valid ChargeBonusRequestDto requestDto) {
+        Long ownerId = principal.id();
 
         log.info("충전 보너스 설정 생성 요청 수신 - 점주ID: {}, 가게ID: {}", ownerId, storeId);
 
@@ -48,8 +50,9 @@ public class ChargeBonusController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<ChargeBonusListResponseDto>>> getChargeBonusList(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId) {
+        Long ownerId = principal.id();
 
         log.info("충전 보너스 설정 목록 조회 요청 수신 - 점주ID: {}, 가게ID: {}", ownerId, storeId);
 
@@ -64,9 +67,10 @@ public class ChargeBonusController {
      */
     @GetMapping("/{chargeBonusId}")
     public ResponseEntity<ApiResponse<ChargeBonusResponseDto>> getChargeBonus(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId,
             @PathVariable @Positive(message = "충전 보너스 ID는 양수여야 합니다.") Long chargeBonusId) {
+        Long ownerId = principal.id();
 
         log.info("충전 보너스 설정 상세 조회 요청 수신 - 점주ID: {}, 가게ID: {}, 보너스ID: {}", ownerId, storeId, chargeBonusId);
 
@@ -81,10 +85,11 @@ public class ChargeBonusController {
      */
     @PutMapping("/{chargeBonusId}")
     public ResponseEntity<ApiResponse<ChargeBonusResponseDto>> updateChargeBonus(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId,
             @PathVariable @Positive(message = "충전 보너스 ID는 양수여야 합니다.") Long chargeBonusId,
             @RequestBody @Valid ChargeBonusRequestDto requestDto) {
+        Long ownerId = principal.id();
 
         log.info("충전 보너스 설정 수정 요청 수신 - 점주ID: {}, 가게ID: {}, 보너스ID: {}", ownerId, storeId, chargeBonusId);
 
@@ -99,9 +104,10 @@ public class ChargeBonusController {
      */
     @DeleteMapping("/{chargeBonusId}")
     public ResponseEntity<ApiResponse<Void>> deleteChargeBonus(
-            @AuthenticationPrincipal Long ownerId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable @Positive(message = "가게 ID는 양수여야 합니다.") Long storeId,
             @PathVariable @Positive(message = "충전 보너스 ID는 양수여야 합니다.") Long chargeBonusId) {
+        Long ownerId = principal.id();
 
         log.info("충전 보너스 설정 삭제 요청 수신 - 점주ID: {}, 가게ID: {}, 보너스ID: {}", ownerId, storeId, chargeBonusId);
 

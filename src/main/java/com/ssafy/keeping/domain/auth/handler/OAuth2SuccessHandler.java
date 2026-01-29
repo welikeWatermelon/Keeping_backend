@@ -1,19 +1,18 @@
 package com.ssafy.keeping.domain.auth.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.keeping.domain.auth.cookie.RefreshCookieManager;
 import com.ssafy.keeping.domain.auth.enums.AuthProvider;
 import com.ssafy.keeping.domain.auth.enums.UserRole;
 import com.ssafy.keeping.domain.auth.signup.ticket.SignupTicketPayload;
 import com.ssafy.keeping.domain.auth.signup.ticket.SignupTicketPayloadFactory;
 import com.ssafy.keeping.domain.auth.signup.ticket.SignupTicketService;
-import com.ssafy.keeping.domain.auth.token.AccessTokenService;
 import com.ssafy.keeping.domain.auth.token.RefreshTokenService;
 import com.ssafy.keeping.domain.user.customer.service.CustomerService;
 import com.ssafy.keeping.domain.user.owner.service.OwnerService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
@@ -21,6 +20,7 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
 import java.util.Map;
@@ -29,14 +29,18 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
-    private final ObjectMapper objectMapper; // 자바 객체(Map 등)를 JSON 문자열로 바꿔서 response에 쓰기 위함
     private final CustomerService customerService;
     private final OwnerService ownerService;
     private final SignupTicketService signupTicketService; // 미가입일 때 Redis에 티켓 저장하고 ticket(UUID) 발급
 
-    private final AccessTokenService accessTokenService; // accessToken(JWT) 발급
     private final RefreshTokenService refreshTokenService; //  refreshToken(UUID) 발급
     private final RefreshCookieManager refreshCookieManager;
+
+    @Value("${fe.base-url}")
+    private String redirectBaseUrl;
+
+    @Value("${app.auth.redirect-path}")
+    private String redirectPath;
 
     // OAuth2 인증이 성공했을 때 스프링이 호출해주는 메서드
     // authentication 안에 OAuth2 로그인 결과(Principal, registrationId 등)가 들어있다.
@@ -82,55 +86,38 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             String nickname = getKakaoNickname(attrs);
             String profileUrl = getKakaoProfileImageUrl(attrs);
 
-            // 미가입 → ticket 발급
+            // 미가입 → ticket 발급 후 role별 회원가입 페이지로 리다이렉트
             SignupTicketPayload payload = SignupTicketPayloadFactory.payload(role, providerType, providerId, nickname, profileUrl);
             String ticket = signupTicketService.create(payload, Duration.ofMinutes(10));
 
-            writeJson(response, 200, Map.of(
-                    "status", "SIGNUP_REQUIRED",
-                    "role", role.name(),
-                    "ticket", ticket,
-                    "expiresIn", 600
-            ));
+            String registerPath = (role == UserRole.CUSTOMER) ? "/customer/register" : "/owner/register";
+            String signupRedirectUrl = UriComponentsBuilder.fromUriString(redirectBaseUrl + registerPath)
+                    .queryParam("ticket", ticket)
+                    .build().toUriString();
+            response.sendRedirect(signupRedirectUrl);
         } catch (Exception e) {
             try {
-                writeJson(response, 500, Map.of("status", "ERROR", "message", e.getMessage()));
+                String errorRedirectUrl = UriComponentsBuilder.fromUriString(redirectBaseUrl + redirectPath)
+                        .queryParam("status", "ERROR")
+                        .build().toUriString();
+                response.sendRedirect(errorRedirectUrl);
             } catch (Exception ignored) {}
         }
     }
 
     private void respondLoginSuccess(HttpServletResponse response, long userId, UserRole role) throws Exception {
-        String subject = String.valueOf(userId);
-
-        // 1) access 발급 (JWT)
-        String accessToken = accessTokenService.issueAccessToken(subject, role);
-
-        // 2) refresh 발급 (opaque UUID, Redis 저장)
+        // 1) refresh 발급 (opaque UUID, Redis 저장)
         var issued = refreshTokenService.issueSingleSession(userId, role);
 
-        // 3) refresh를 HttpOnly 쿠키로 내려줌
+        // 2) refresh를 HttpOnly 쿠키로 내려줌
         ResponseCookie cookie = refreshCookieManager.issue(issued.token(), issued.ttlSeconds());
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        // 4) access는 JSON으로 내려줌
-        writeJson(response, 200, Map.of(
-                "status", "SUCCESS",
-                "role", role.name(),
-                "accessToken", accessToken,
-                "tokenType", "Bearer",
-                "expiresIn", accessTokenService.accessTtlSeconds()
-        ));
-    }
-
-    private void writeJson(HttpServletResponse response, int status, Object body) throws Exception {
-        response.setStatus(status);
-        response.setCharacterEncoding("UTF-8");
-        response.setContentType("application/json");
-        // 캐시 방지
-        response.setHeader("Cache-Control", "no-store");
-        response.setHeader("Pragma", "no-cache");
-
-        response.getWriter().write(objectMapper.writeValueAsString(body));
+        // 3) 프론트 로그인 성공 페이지로 리다이렉트 (accessToken은 프론트에서 POST /auth/refresh로 발급)
+        String redirectUrl = UriComponentsBuilder.fromUriString(redirectBaseUrl + redirectPath)
+                .queryParam("status", "SUCCESS")
+                .build().toUriString();
+        response.sendRedirect(redirectUrl);
     }
 
     @SuppressWarnings("unchecked")

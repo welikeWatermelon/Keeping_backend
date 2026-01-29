@@ -43,9 +43,7 @@ public class SecurityConfig {
 
             // todo: 아래 경로들이 인증이 필요 없는 부분인지 확인하기
             "/login/**",
-
             "/oauth2/**",
-
             "/error",
             "/actuator/health",
             "/swagger-ui/**",
@@ -54,11 +52,7 @@ public class SecurityConfig {
             "/favicon.ico",
             "/.well-known/**",
             "/s3/**",
-//            "/owners/stores/**", 인증필요
-//            "/api/v1/stores/**",
             "/ocr/*",
-            "/customer/register/**",
-            "/owners/register/**",
             "/debug/redis",
             "/swagger-ui.html"
     };

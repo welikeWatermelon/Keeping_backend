@@ -24,16 +24,20 @@ public class PaymentIntentController {
 
     /**
      * 점원/점주가 손님 QR을 스캔하고 결제 의도를 생성
+     *
+     * 흐름:
+     * 1. POST /api/qr/{qrTokenId}/scan → 세션 토큰 발급
+     * 2. POST /cpqr/{sessionToken}/initiate → 결제 의도 생성 (이 API)
      */
-    @PostMapping("/cpqr/{qrTokenId}/initiate")
+    @PostMapping("/cpqr/{sessionToken}/initiate")
     public ResponseEntity<ApiResponse<PaymentIntentDetailResponse>> initiate(
-            @PathVariable String qrTokenId,
+            @PathVariable String sessionToken,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKeyHeader,
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody PaymentInitiateRequest body
     ) {
         IdempotentResult<PaymentIntentDetailResponse> res =
-                paymentIntentService.initiate(qrTokenId, idempotencyKeyHeader, principal.id(), body);
+                paymentIntentService.initiate(sessionToken, idempotencyKeyHeader, principal.id(), body);
 
         return ResponseEntity
                 .status(res.getHttpStatus())

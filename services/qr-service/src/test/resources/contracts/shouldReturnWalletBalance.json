@@ -1,0 +1,18 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/internal/wallets/1/stores/1/balance",
+    "headers": {
+      "X-Internal-Auth": "internal-service-token-12345"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "balance": 50000
+    }
+  }
+}

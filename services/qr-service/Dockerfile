@@ -1,5 +1,5 @@
 # 로컬에서 빌드한 JAR를 복사해서 실행
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 

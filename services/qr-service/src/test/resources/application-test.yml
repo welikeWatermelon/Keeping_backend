@@ -1,0 +1,21 @@
+# 테스트용 설정 (DB 없이 실행)
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+  cache:
+    type: none
+
+# Stub Runner가 8080 포트에서 WireMock 실행
+monolith:
+  url: http://localhost:8080
+
+internal:
+  auth-token: internal-service-token-12345
+
+jwt:
+  secret: NbPg+8/rCm9yW15pYbbOTXdg1QTPqDcRMA8oauseuOqzrAdkLMcXfmbMLkqt3tZ5HecMd5bnCscx4Iuo2EjnJA==
+  issuer: kakao-oauth2-jwt

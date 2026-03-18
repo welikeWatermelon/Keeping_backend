@@ -2,7 +2,14 @@ package com.ssafy.keeping.qr.acl;
 
 import com.ssafy.keeping.qr.acl.dto.FundsCaptureRequest;
 import com.ssafy.keeping.qr.acl.dto.FundsResponse;
+import com.ssafy.keeping.qr.acl.dto.PaymentCheckResponse;
+import com.ssafy.keeping.qr.acl.dto.RefundRequest;
+import com.ssafy.keeping.qr.acl.dto.RefundResponse;
 import com.ssafy.keeping.qr.acl.dto.WalletBalanceResponse;
+import com.ssafy.keeping.qr.common.exception.CustomException;
+import com.ssafy.keeping.qr.common.exception.ErrorCode;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,88 +40,151 @@ public class WalletClient {
     private String internalAuthToken;
 
     /**
-     * 지갑 잔액 조회 (매장별)
+     * 지갑 잔액 조회 (매장별) - 읽기 전용이므로 재시도 가능
      */
+    @CircuitBreaker(name = "walletClient", fallbackMethod = "getBalanceFallback")
+    @Retry(name = "walletClientReadOnly", fallbackMethod = "getBalanceFallback")
     public BigDecimal getBalance(Long walletId, Long storeId) {
         String url = monolithUrl + "/internal/wallets/" + walletId + "/stores/" + storeId + "/balance";
 
-        try {
-            HttpHeaders headers = createHeaders();
+        HttpHeaders headers = createHeaders();
 
-            ResponseEntity<WalletBalanceResponse> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    new HttpEntity<>(headers),
-                    WalletBalanceResponse.class
-            );
+        ResponseEntity<WalletBalanceResponse> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                WalletBalanceResponse.class
+        );
 
-            if (response.getBody() != null) {
-                return response.getBody().getBalance();
-            }
-            return BigDecimal.ZERO;
-
-        } catch (Exception e) {
-            log.error("Wallet 서비스 호출 실패: walletId={}, storeId={}, error={}", walletId, storeId, e.getMessage());
-            throw new RuntimeException("Wallet 서비스 호출 실패", e);
+        if (response.getBody() != null) {
+            return response.getBody().getBalance();
         }
+        return BigDecimal.ZERO;
+    }
+
+    private BigDecimal getBalanceFallback(Long walletId, Long storeId, Throwable t) {
+        log.error("Wallet 잔액 조회 Fallback 호출: walletId={}, storeId={}, error={}",
+                walletId, storeId, t.getMessage());
+        throw new CustomException(ErrorCode.WALLET_SERVICE_UNAVAILABLE, t);
     }
 
     /**
-     * 자금 캡처 (결제 시 잔액 차감 + 거래 내역 생성)
+     * 자금 캡처 (결제 시 잔액 차감 + 거래 내역 생성) - 쓰기 작업이므로 strict 재시도
+     * 멱등성 키를 통해 네트워크 재시도 시 중복 결제 방지
      */
-    public FundsResponse capture(FundsCaptureRequest request) {
+    @CircuitBreaker(name = "walletClient", fallbackMethod = "captureFallback")
+    @Retry(name = "walletClient", fallbackMethod = "captureFallback")
+    public FundsResponse capture(FundsCaptureRequest request, String idempotencyKey) {
         String url = monolithUrl + "/internal/wallets/" + request.getWalletId()
                 + "/stores/" + request.getStoreId() + "/capture";
 
-        try {
-            HttpHeaders headers = createHeaders();
-            headers.set("Content-Type", "application/json");
+        HttpHeaders headers = createHeaders();
+        headers.set("Content-Type", "application/json");
+        headers.set("Idempotency-Key", idempotencyKey);
 
-            ResponseEntity<FundsResponse> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.POST,
-                    new HttpEntity<>(request, headers),
-                    FundsResponse.class
-            );
+        ResponseEntity<FundsResponse> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                new HttpEntity<>(request, headers),
+                FundsResponse.class
+        );
 
-            log.info("자금 캡처 완료: walletId={}, storeId={}, amount={}",
-                    request.getWalletId(), request.getStoreId(), request.getAmount());
+        log.info("자금 캡처 완료: walletId={}, storeId={}, amount={}, idempotencyKey={}",
+                request.getWalletId(), request.getStoreId(), request.getAmount(), idempotencyKey);
 
-            return response.getBody();
+        return response.getBody();
+    }
 
-        } catch (Exception e) {
-            log.error("자금 캡처 실패: walletId={}, storeId={}, amount={}, error={}",
-                    request.getWalletId(), request.getStoreId(), request.getAmount(), e.getMessage());
-            throw new RuntimeException("자금 캡처 실패", e);
-        }
+    private FundsResponse captureFallback(FundsCaptureRequest request, String idempotencyKey, Throwable t) {
+        log.error("자금 캡처 Fallback 호출: walletId={}, storeId={}, amount={}, idempotencyKey={}, error={}",
+                request.getWalletId(), request.getStoreId(), request.getAmount(), idempotencyKey, t.getMessage());
+        throw new CustomException(ErrorCode.WALLET_SERVICE_UNAVAILABLE, t);
     }
 
     /**
-     * 자금 복원 (결제 취소 시)
+     * 자금 복원 (결제 취소 시) - 쓰기 작업이므로 strict 재시도
      */
+    @CircuitBreaker(name = "walletClient", fallbackMethod = "restoreFallback")
+    @Retry(name = "walletClient", fallbackMethod = "restoreFallback")
     public void restore(Long walletId, Long storeId, Long amount) {
         String url = monolithUrl + "/internal/wallets/" + walletId + "/stores/" + storeId + "/restore";
 
-        try {
-            HttpHeaders headers = createHeaders();
-            headers.set("Content-Type", "application/json");
+        HttpHeaders headers = createHeaders();
+        headers.set("Content-Type", "application/json");
 
-            RestoreRequest body = new RestoreRequest(amount);
+        RestoreRequest body = new RestoreRequest(amount);
 
-            restTemplate.exchange(
-                    url,
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    Void.class
-            );
+        restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                new HttpEntity<>(body, headers),
+                Void.class
+        );
 
-            log.info("잔액 복원 완료: walletId={}, storeId={}, amount={}", walletId, storeId, amount);
+        log.info("잔액 복원 완료: walletId={}, storeId={}, amount={}", walletId, storeId, amount);
+    }
 
-        } catch (Exception e) {
-            log.error("잔액 복원 실패: walletId={}, storeId={}, amount={}, error={}",
-                    walletId, storeId, amount, e.getMessage());
-            throw new RuntimeException("잔액 복원 실패", e);
-        }
+    private void restoreFallback(Long walletId, Long storeId, Long amount, Throwable t) {
+        log.error("잔액 복원 Fallback 호출: walletId={}, storeId={}, amount={}, error={}",
+                walletId, storeId, amount, t.getMessage());
+        throw new CustomException(ErrorCode.WALLET_SERVICE_UNAVAILABLE, t);
+    }
+
+    /**
+     * 결제 상태 확인 - 멱등성 키로 기존 결제 존재 여부 확인
+     */
+    @CircuitBreaker(name = "walletClient", fallbackMethod = "checkPaymentFallback")
+    @Retry(name = "walletClientReadOnly", fallbackMethod = "checkPaymentFallback")
+    public PaymentCheckResponse checkPayment(String idempotencyKey) {
+        String url = monolithUrl + "/internal/payments/check?idempotencyKey=" + idempotencyKey;
+
+        HttpHeaders headers = createHeaders();
+
+        ResponseEntity<PaymentCheckResponse> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                PaymentCheckResponse.class
+        );
+
+        return response.getBody();
+    }
+
+    private PaymentCheckResponse checkPaymentFallback(String idempotencyKey, Throwable t) {
+        log.error("결제 상태 확인 Fallback 호출: idempotencyKey={}, error={}",
+                idempotencyKey, t.getMessage());
+        throw new CustomException(ErrorCode.WALLET_SERVICE_UNAVAILABLE, t);
+    }
+
+    /**
+     * 환불 처리 - 기존 결제에 대한 환불
+     */
+    @CircuitBreaker(name = "walletClient", fallbackMethod = "refundFallback")
+    @Retry(name = "walletClient", fallbackMethod = "refundFallback")
+    public RefundResponse refund(RefundRequest request, String idempotencyKey) {
+        String url = monolithUrl + "/internal/wallets/" + request.getWalletId() + "/refund";
+
+        HttpHeaders headers = createHeaders();
+        headers.set("Content-Type", "application/json");
+        headers.set("Idempotency-Key", idempotencyKey);
+
+        ResponseEntity<RefundResponse> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                new HttpEntity<>(request, headers),
+                RefundResponse.class
+        );
+
+        log.info("환불 처리 완료: walletId={}, storeId={}, amount={}, idempotencyKey={}",
+                request.getWalletId(), request.getStoreId(), request.getAmount(), idempotencyKey);
+
+        return response.getBody();
+    }
+
+    private RefundResponse refundFallback(RefundRequest request, String idempotencyKey, Throwable t) {
+        log.error("환불 처리 Fallback 호출: walletId={}, storeId={}, amount={}, idempotencyKey={}, error={}",
+                request.getWalletId(), request.getStoreId(), request.getAmount(), idempotencyKey, t.getMessage());
+        throw new CustomException(ErrorCode.WALLET_SERVICE_UNAVAILABLE, t);
     }
 
     private HttpHeaders createHeaders() {

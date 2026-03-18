@@ -26,6 +26,10 @@ public enum ErrorCode {
     QR_EXPIRED(HttpStatus.GONE, "QR 토큰이 만료되었습니다."),
     QR_STORE_MISMATCH(HttpStatus.FORBIDDEN, "바인딩된 매장과 일치하지 않는 요청입니다."),
 
+    // 세션 토큰
+    SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "세션 토큰을 찾을 수 없습니다. QR을 다시 스캔해주세요."),
+    SESSION_EXPIRED(HttpStatus.GONE, "세션이 만료되었습니다. QR을 다시 스캔해주세요."),
+
     // 스냅샷/직렬화
     REQUEST_CANONICALIZE_FAILED(HttpStatus.BAD_REQUEST, "요청 본문 직렬화에 실패했습니다."),
     RESPONSE_SNAPSHOT_PARSE_FAILED(HttpStatus.CONFLICT, "이전에 처리된 응답을 복원할 수 없습니다."),
@@ -59,6 +63,17 @@ public enum ErrorCode {
 
     // 외부 API 관련
     EXTERNAL_API_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "외부 API 통신 중 오류가 발생했습니다."),
+
+    // Circuit Breaker 관련
+    CIRCUIT_BREAKER_OPEN(HttpStatus.SERVICE_UNAVAILABLE, "서비스가 일시적으로 이용 불가합니다. 잠시 후 다시 시도해주세요."),
+    SERVICE_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "서비스 응답 시간이 초과되었습니다."),
+    MONOLITH_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "결제 서비스에 연결할 수 없습니다."),
+
+    // 클라이언트별 Fallback
+    WALLET_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "지갑 서비스가 일시적으로 이용 불가합니다."),
+    CUSTOMER_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "고객 서비스가 일시적으로 이용 불가합니다."),
+    STORE_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "매장 서비스가 일시적으로 이용 불가합니다."),
+    MENU_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "메뉴 서비스가 일시적으로 이용 불가합니다."),
 
     // global
     BAD_REQUEST(HttpStatus.BAD_REQUEST, "올바르지 않은 요청값입니다."),

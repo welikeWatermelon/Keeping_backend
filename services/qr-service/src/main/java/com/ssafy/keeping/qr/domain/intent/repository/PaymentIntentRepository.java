@@ -37,4 +37,21 @@ public interface PaymentIntentRepository extends JpaRepository<PaymentIntent, Lo
     @Modifying
     @Query("UPDATE PaymentIntent pi SET pi.status = 'EXPIRED' WHERE pi.status = 'PENDING' AND pi.expiresAt < :now")
     int expirePendingIntents(@Param("now") LocalDateTime now);
+
+    /**
+     * 복구 대상 조회: UNCERTAIN 상태이거나 만료된 PENDING 상태의 Intent
+     */
+    @Query("""
+        SELECT pi FROM PaymentIntent pi
+        WHERE (pi.status = :uncertainStatus
+               OR (pi.status = :pendingStatus AND pi.expiresAt < :now))
+          AND pi.createdAt > :since
+        ORDER BY pi.createdAt ASC
+        """)
+    List<PaymentIntent> findRecoveryTargets(
+            @Param("uncertainStatus") PaymentStatus uncertainStatus,
+            @Param("pendingStatus") PaymentStatus pendingStatus,
+            @Param("now") LocalDateTime now,
+            @Param("since") LocalDateTime since
+    );
 }

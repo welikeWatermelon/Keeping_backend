@@ -1,5 +1,6 @@
 package com.ssafy.keeping.qr.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,11 +11,17 @@ import java.time.Duration;
 @Configuration
 public class RestTemplateConfig {
 
+    @Value("${rest-template.connect-timeout:10000}")
+    private int connectTimeout;
+
+    @Value("${rest-template.read-timeout:30000}")
+    private int readTimeout;
+
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
         return builder
-                .setConnectTimeout(Duration.ofSeconds(5))
-                .setReadTimeout(Duration.ofSeconds(5))
+                .setConnectTimeout(Duration.ofMillis(connectTimeout))
+                .setReadTimeout(Duration.ofMillis(readTimeout))
                 .build();
     }
 }

@@ -25,7 +25,8 @@ import java.util.UUID;
         indexes = {
                 @Index(name = "idx_status_expires", columnList = "status,expires_at"),
                 @Index(name = "idx_store_status", columnList = "store_id,status"),
-                @Index(name = "idx_wallet_status", columnList = "wallet_id,status")
+                @Index(name = "idx_wallet_status", columnList = "wallet_id,status"),
+                @Index(name = "idx_recovery", columnList = "status,expires_at,created_at")
         }
 )
 public class PaymentIntent {
@@ -85,6 +86,12 @@ public class PaymentIntent {
     @Column(name = "idempotency_key", length = 64, unique = true)
     private String idempotencyKey;
 
+    @Column(name = "recovered_at", columnDefinition = "DATETIME(3)")
+    private LocalDateTime recoveredAt;
+
+    @Column(name = "recovery_note", length = 500)
+    private String recoveryNote;
+
     @PrePersist
     public void onCreate() {
         if (publicId == null) publicId = UUID.randomUUID();
@@ -132,5 +139,21 @@ public class PaymentIntent {
             throw new CustomException(ErrorCode.PAYMENT_STATUS_CONFLICT);
         }
         this.status = PaymentStatus.EXPIRED;
+    }
+
+    public void markUncertain() {
+        if (this.status != PaymentStatus.PENDING && this.status != PaymentStatus.APPROVED) {
+            throw new CustomException(ErrorCode.PAYMENT_STATUS_CONFLICT);
+        }
+        this.status = PaymentStatus.UNCERTAIN;
+    }
+
+    public void markRolledBack(LocalDateTime now, String note) {
+        if (this.status != PaymentStatus.UNCERTAIN) {
+            throw new CustomException(ErrorCode.PAYMENT_STATUS_CONFLICT);
+        }
+        this.status = PaymentStatus.ROLLED_BACK;
+        this.recoveredAt = now;
+        this.recoveryNote = note;
     }
 }

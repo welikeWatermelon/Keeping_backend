@@ -26,7 +26,7 @@ import com.ssafy.keeping.qr.domain.intent.model.PaymentIntent;
 import com.ssafy.keeping.qr.domain.intent.model.PaymentIntentItem;
 import com.ssafy.keeping.qr.domain.intent.repository.PaymentIntentItemRepository;
 import com.ssafy.keeping.qr.domain.intent.repository.PaymentIntentRepository;
-import com.ssafy.keeping.qr.domain.qr.model.QrToken;
+import com.ssafy.keeping.qr.domain.qr.model.QrScanSession;
 import com.ssafy.keeping.qr.domain.qr.service.QrTokenService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -83,9 +83,10 @@ public class PaymentIntentService {
 
     /**
      * 결제 의도 생성
+     * 세션 토큰 기반 (QR 스캔 후 발급받은 토큰)
      */
     @Transactional
-    public IdempotentResult<PaymentIntentDetailResponse> initiate(String qrTokenId,
+    public IdempotentResult<PaymentIntentDetailResponse> initiate(String sessionToken,
                                                                   String idempotencyKeyHeader,
                                                                   Long ownerId,
                                                                   PaymentInitiateRequest req) {
@@ -106,7 +107,7 @@ public class PaymentIntentService {
 
         // 멱등 선점 또는 로드
         UUID keyUuid = UUID.fromString(idempotencyKeyHeader);
-        String path = "/cpqr/" + qrTokenId + "/initiate";
+        String path = "/cpqr/" + sessionToken + "/initiate";
         IdemBegin begin = idempotencyService.beginOrLoad(IdemActorType.MERCHANT, ownerId, "POST", path, keyUuid, bodyHash);
 
         IdempotencyKey slot = begin.getRow();
@@ -137,16 +138,16 @@ public class PaymentIntentService {
             return IdempotentResult.acceptedWithRetryAfterSeconds(2);
         }
 
-        // QR 검증 - 자체 Redis에서 조회
-        QrToken qr = qrTokenService.findToken(qrTokenId)
-                .orElseThrow(() -> new CustomException(ErrorCode.QR_NOT_FOUND));
+        // 세션 토큰 검증 - 자체 Redis에서 조회 (QR 스캔 후 발급된 세션)
+        QrScanSession session = qrTokenService.findSession(sessionToken)
+                .orElseThrow(() -> new CustomException(ErrorCode.SESSION_NOT_FOUND));
 
         LocalDateTime now = LocalDateTime.now(clock);
 
-        if (qr.getExpiresAt() != null && now.isAfter(qr.getExpiresAt())) {
-            throw new CustomException(ErrorCode.QR_EXPIRED);
+        if (session.getExpiresAt() != null && now.isAfter(session.getExpiresAt())) {
+            throw new CustomException(ErrorCode.SESSION_EXPIRED);
         }
-        if (!Objects.equals(qr.getBindStoreId(), req.getStoreId())) {
+        if (!Objects.equals(session.getBindStoreId(), req.getStoreId())) {
             throw new CustomException(ErrorCode.QR_STORE_MISMATCH);
         }
 
@@ -182,9 +183,9 @@ public class PaymentIntentService {
         // Intent 생성
         PaymentIntent intent = PaymentIntent.builder()
                 .publicId(IdUtil.newUuidV7())
-                .qrTokenId(qrTokenId)
-                .customerId(qr.getCustomerId())
-                .walletId(qr.getWalletId())
+                .qrTokenId(sessionToken)
+                .customerId(session.getCustomerId())
+                .walletId(session.getWalletId())
                 .storeId(req.getStoreId())
                 .amount(total)
                 .status(PaymentStatus.PENDING)
@@ -226,13 +227,13 @@ public class PaymentIntentService {
 
             String notificationContent = String.format("%s에서 %,d원 결제 요청이 도착했습니다.", storeName, intent.getAmount());
             notificationClient.sendToCustomer(
-                    qr.getCustomerId(),
+                    session.getCustomerId(),
                     "PAYMENT_REQUEST",
                     notificationContent
             );
-            log.info("결제 요청 알림 전송 완료 - 손님ID: {}, 결제 금액: {}", qr.getCustomerId(), intent.getAmount());
+            log.info("결제 요청 알림 전송 완료 - 손님ID: {}, 결제 금액: {}", session.getCustomerId(), intent.getAmount());
         } catch (Exception e) {
-            log.warn("결제 요청 알림 전송 실패 - 손님ID: {}, error: {}", qr.getCustomerId(), e.getMessage());
+            log.warn("결제 요청 알림 전송 실패 - 손님ID: {}, error: {}", session.getCustomerId(), e.getMessage());
             // 알림 실패해도 결제 시작은 성공 처리 (고객이 앱에서 직접 확인 가능)
         }
 

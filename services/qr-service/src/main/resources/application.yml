@@ -27,6 +27,10 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
 
+  # Spring Cache (Redis)
+  cache:
+    type: redis
+
 # JWT 설정 (모놀리스와 같은 키 사용!)
 jwt:
   secret: ${JWT_SECRET:NbPg+8/rCm9yW15pYbbOTXdg1QTPqDcRMA8oauseuOqzrAdkLMcXfmbMLkqt3tZ5HecMd5bnCscx4Iuo2EjnJA==}
@@ -40,7 +44,14 @@ monolith:
 internal:
   auth-token: ${INTERNAL_AUTH_TOKEN:internal-service-token-12345}
 
-# Actuator
+# 캐시 모드 및 워밍 설정
+cache:
+  # 캐시 모드: NONE / PULL / PUSH
+  mode: ${CACHE_MODE:PUSH}
+  warming:
+    enabled: ${CACHE_WARMING_ENABLED:true}
+
+# Actuator + Tracing
 management:
   endpoints:
     web:
@@ -49,8 +60,90 @@ management:
   endpoint:
     health:
       show-details: always
+  tracing:
+    sampling:
+      probability: 1.0  # 100% 샘플링 (개발용, 운영에서는 0.1 권장)
+    enabled: true
+  zipkin:
+    tracing:
+      enabled: false  # Zipkin 서버 없이 로그 기반 추적
+
+# OpenAPI 문서화
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# 로깅 (TraceId 포함)
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
 
 # 로드테스트 백도어 (테스트용)
 loadtest:
   backdoor:
     enabled: ${LOADTEST_BACKDOOR_ENABLED:false}
+
+# RestTemplate 타임아웃 (물리 서버 분리 대비)
+rest-template:
+  connect-timeout: 10000  # 10초 (기존 5초)
+  read-timeout: 30000     # 30초 (기존 5초)
+
+# Resilience4j 설정
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      strict:  # WalletClient용 (엄격)
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 40
+        waitDurationInOpenState: 60s
+      lenient:  # NotificationClient용 (관대)
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 70
+        waitDurationInOpenState: 15s
+    instances:
+      walletClient:
+        baseConfig: strict
+      customerClient:
+        baseConfig: default
+      storeClient:
+        baseConfig: default
+      menuClient:
+        baseConfig: default
+      notificationClient:
+        baseConfig: lenient
+
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 500ms
+      strict:  # WalletClient 쓰기용 (최소 재시도)
+        maxAttempts: 2
+        waitDuration: 1000ms
+      lenient:  # NotificationClient용
+        maxAttempts: 2
+        waitDuration: 200ms
+    instances:
+      walletClient:
+        baseConfig: strict
+      walletClientReadOnly:
+        baseConfig: default
+      customerClient:
+        baseConfig: default
+      storeClient:
+        baseConfig: default
+      menuClient:
+        baseConfig: default
+      notificationClient:
+        baseConfig: lenient

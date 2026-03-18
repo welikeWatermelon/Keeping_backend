@@ -88,3 +88,14 @@ monitoring/load-tests/results/*.json
 
 ### Error logs ###
 hs_err_pid*.log
+replay_pid*.log
+
+### Docker tar files ###
+*.tar
+
+### Temp files ###
+body.json
+nul
+
+### Local MySQL data ###
+mysql/

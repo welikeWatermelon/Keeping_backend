@@ -4,12 +4,14 @@ import com.ssafy.keeping.domain.auth.pin.service.PinAuthService;
 import com.ssafy.keeping.domain.internal.dto.CustomerResponse;
 import com.ssafy.keeping.domain.internal.dto.PinVerifyRequest;
 import com.ssafy.keeping.domain.internal.dto.PinVerifyResponse;
+import com.ssafy.keeping.domain.internal.exception.InternalApiAuthException;
 import com.ssafy.keeping.domain.user.customer.model.Customer;
 import com.ssafy.keeping.domain.user.customer.repository.CustomerRepository;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,7 +27,8 @@ public class InternalCustomerController {
     private final CustomerRepository customerRepository;
     private final PinAuthService pinAuthService;
 
-    private static final String INTERNAL_AUTH_TOKEN = "internal-service-token-12345";
+    @Value("${internal.auth-token:internal-service-token-12345}")
+    private String internalAuthToken;
 
     /**
      * 고객 정보 조회
@@ -89,9 +92,9 @@ public class InternalCustomerController {
     }
 
     private void validateInternalAuth(String authToken) {
-        if (!INTERNAL_AUTH_TOKEN.equals(authToken)) {
+        if (!internalAuthToken.equals(authToken)) {
             log.warn("Internal API 인증 실패: 잘못된 토큰");
-            throw new IllegalArgumentException("Internal API 인증 실패");
+            throw new InternalApiAuthException("Internal API 인증 실패");
         }
     }
 }

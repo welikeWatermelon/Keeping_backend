@@ -1,10 +1,12 @@
 package com.ssafy.keeping.domain.internal.controller;
 
 import com.ssafy.keeping.domain.internal.dto.NotificationRequest;
+import com.ssafy.keeping.domain.internal.exception.InternalApiAuthException;
 import com.ssafy.keeping.domain.notification.entity.NotificationType;
 import com.ssafy.keeping.domain.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,7 +23,8 @@ public class InternalNotificationController {
 
     private final NotificationService notificationService;
 
-    private static final String INTERNAL_AUTH_TOKEN = "internal-service-token-12345";
+    @Value("${internal.auth-token:internal-service-token-12345}")
+    private String internalAuthToken;
 
     /**
      * 알림 발송
@@ -63,9 +66,9 @@ public class InternalNotificationController {
     }
 
     private void validateInternalAuth(String authToken) {
-        if (!INTERNAL_AUTH_TOKEN.equals(authToken)) {
+        if (!internalAuthToken.equals(authToken)) {
             log.warn("Internal API 인증 실패: 잘못된 토큰");
-            throw new IllegalArgumentException("Internal API 인증 실패");
+            throw new InternalApiAuthException("Internal API 인증 실패");
         }
     }
 }

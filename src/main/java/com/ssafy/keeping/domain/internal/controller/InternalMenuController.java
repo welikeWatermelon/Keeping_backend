@@ -2,10 +2,12 @@ package com.ssafy.keeping.domain.internal.controller;
 
 import com.ssafy.keeping.domain.internal.dto.BatchMenuRequest;
 import com.ssafy.keeping.domain.internal.dto.MenuResponse;
+import com.ssafy.keeping.domain.internal.exception.InternalApiAuthException;
 import com.ssafy.keeping.domain.menu.model.Menu;
 import com.ssafy.keeping.domain.menu.repository.MenuRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +25,8 @@ public class InternalMenuController {
 
     private final MenuRepository menuRepository;
 
-    private static final String INTERNAL_AUTH_TOKEN = "internal-service-token-12345";
+    @Value("${internal.auth-token:internal-service-token-12345}")
+    private String internalAuthToken;
 
     /**
      * 메뉴 일괄 조회
@@ -64,10 +67,28 @@ public class InternalMenuController {
         return ResponseEntity.ok(MenuResponse.from(menu));
     }
 
+    /**
+     * 전체 활성 메뉴 조회 (Cache Warming용)
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<MenuResponse>> getAllMenus(
+            @RequestHeader(value = "X-Internal-Auth", required = false) String authToken
+    ) {
+        validateInternalAuth(authToken);
+
+        List<Menu> menus = menuRepository.findAllActiveMenus();
+        List<MenuResponse> response = menus.stream()
+                .map(MenuResponse::from)
+                .collect(Collectors.toList());
+
+        log.info("전체 Menu 조회 (Cache Warming): count={}", response.size());
+        return ResponseEntity.ok(response);
+    }
+
     private void validateInternalAuth(String authToken) {
-        if (!INTERNAL_AUTH_TOKEN.equals(authToken)) {
+        if (!internalAuthToken.equals(authToken)) {
             log.warn("Internal API 인증 실패: 잘못된 토큰");
-            throw new IllegalArgumentException("Internal API 인증 실패");
+            throw new InternalApiAuthException("Internal API 인증 실패");
         }
     }
 }

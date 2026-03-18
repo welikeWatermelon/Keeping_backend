@@ -1,5 +1,6 @@
 package com.ssafy.keeping.global.exception.handlers;
 
+import com.ssafy.keeping.domain.internal.exception.InternalApiAuthException;
 import com.ssafy.keeping.global.exception.CustomException;
 import com.ssafy.keeping.global.exception.constants.ErrorCode;
 import com.ssafy.keeping.global.response.ApiResponse;
@@ -166,6 +167,17 @@ public class GlobalExceptionHandler {
             t = t.getCause();
         }
         return false;
+    }
+
+    // 3-1. Internal API 인증 실패
+    @ExceptionHandler(InternalApiAuthException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInternalApiAuthException(
+            InternalApiAuthException e, HttpServletRequest request) {
+        log.warn("Internal API 인증 실패: {} at {}", e.getMessage(), request.getRequestURI());
+
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(e.getMessage(), HttpStatus.UNAUTHORIZED.value()));
     }
 
     // 4. 커스텀 예외

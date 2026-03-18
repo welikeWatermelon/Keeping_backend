@@ -144,4 +144,19 @@ public class IdempotencyService {
         idempotencyKeyRepository.save(row);
     }
 
+    /**
+     * 멱등성 키 문자열로 조회 (롤백 이벤트 처리용)
+     * @param keyString UUID 문자열 형태의 멱등성 키
+     * @return 해당 멱등성 키 레코드, 없거나 잘못된 형식이면 null
+     */
+    public IdempotencyKey findByKeyString(String keyString) {
+        try {
+            UUID keyUuid = UUID.fromString(keyString);
+            return idempotencyKeyRepository.findByKeyUuid(keyUuid).orElse(null);
+        } catch (IllegalArgumentException e) {
+            log.warn("잘못된 멱등성 키 형식: {}", keyString);
+            return null;
+        }
+    }
+
 }

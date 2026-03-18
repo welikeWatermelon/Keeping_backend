@@ -1,0 +1,159 @@
+version: '3.8'
+
+# ========================================
+# 로컬 테스트용 통합 docker-compose
+# 3개 서버를 하나의 네트워크에서 실행
+# ========================================
+
+services:
+  # ========================================
+  # Monolith (Server 2)
+  # ========================================
+  monolith:
+    image: keeping-monolith:latest
+    container_name: loadtest-monolith
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=loadtest
+      - SPRING_DATASOURCE_URL=jdbc:mysql://monolith-mysql:3306/ssafy_fintech_db?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=loadtest1234
+      - SPRING_DATA_REDIS_HOST=monolith-redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - JWT_SECRET=NbPg+8/rCm9yW15pYbbOTXdg1QTPqDcRMA8oauseuOqzrAdkLMcXfmbMLkqt3tZ5HecMd5bnCscx4Iuo2EjnJA==
+      - INTERNAL_AUTH_TOKEN=loadtest-internal-token
+      - QR_SERVICE_URL=http://qr-service:8082
+    depends_on:
+      monolith-mysql:
+        condition: service_healthy
+      monolith-redis:
+        condition: service_healthy
+    networks:
+      - loadtest-network
+    restart: unless-stopped
+
+  monolith-mysql:
+    image: mysql:8.0
+    container_name: loadtest-monolith-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=loadtest1234
+      - MYSQL_DATABASE=ssafy_fintech_db
+      - MYSQL_CHARACTER_SET_SERVER=utf8mb4
+      - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
+    volumes:
+      - monolith-mysql-data:/var/lib/mysql
+    networks:
+      - loadtest-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  monolith-redis:
+    image: redis:7-alpine
+    container_name: loadtest-monolith-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - loadtest-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # QR Service (Server 3)
+  # ========================================
+  qr-service:
+    image: keeping-qr-service:latest
+    container_name: loadtest-qr-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=loadtest
+      - MONOLITH_URL=http://monolith:8080
+      - DB_URL=jdbc:mysql://qr-mysql:3306/payment_service?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+      - DB_USERNAME=root
+      - DB_PASSWORD=loadtest1234
+      - REDIS_HOST=qr-redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=NbPg+8/rCm9yW15pYbbOTXdg1QTPqDcRMA8oauseuOqzrAdkLMcXfmbMLkqt3tZ5HecMd5bnCscx4Iuo2EjnJA==
+      - INTERNAL_AUTH_TOKEN=loadtest-internal-token
+      - LOADTEST_BACKDOOR_ENABLED=true
+      - CACHE_MODE=PUSH
+      - CACHE_WARMING_ENABLED=true
+    depends_on:
+      qr-mysql:
+        condition: service_healthy
+      qr-redis:
+        condition: service_healthy
+      monolith:
+        condition: service_started
+    networks:
+      - loadtest-network
+    restart: unless-stopped
+
+  qr-mysql:
+    image: mysql:8.0
+    container_name: loadtest-qr-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=loadtest1234
+      - MYSQL_DATABASE=payment_service
+      - MYSQL_CHARACTER_SET_SERVER=utf8mb4
+      - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
+    volumes:
+      - qr-mysql-data:/var/lib/mysql
+    networks:
+      - loadtest-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  qr-redis:
+    image: redis:7-alpine
+    container_name: loadtest-qr-redis
+    ports:
+      - "6380:6379"
+    networks:
+      - loadtest-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # Nginx Gateway (Server 1)
+  # ========================================
+  nginx:
+    image: nginx:alpine
+    container_name: loadtest-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.local.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - monolith
+      - qr-service
+    networks:
+      - loadtest-network
+    restart: unless-stopped
+
+networks:
+  loadtest-network:
+    driver: bridge
+
+volumes:
+  monolith-mysql-data:
+  qr-mysql-data:

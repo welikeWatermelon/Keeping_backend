@@ -71,4 +71,12 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
 
     /** 점주의 모든 매장 조회 (삭제되지 않은 매장만) */
     List<Store> findByOwnerOwnerIdAndDeletedAtIsNull(Long ownerId);
+
+    /** 전체 활성 매장 조회 (Cache Warming용) */
+    @Query("""
+    select s from Store s
+    where s.storeStatus = :status
+      and s.deletedAt is null
+    """)
+    List<Store> findAllActiveStores(@Param("status") StoreStatus status);
 }

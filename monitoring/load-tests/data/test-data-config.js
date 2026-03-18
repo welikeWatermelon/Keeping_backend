@@ -5,29 +5,36 @@
  */
 
 // ===== ID Ranges =====
+// 1000 VU 부하 테스트를 위한 대용량 테스트 데이터
+
 export const CUSTOMER_ID_START = 10001;
-export const CUSTOMER_ID_END = 10100;
-export const CUSTOMER_COUNT = CUSTOMER_ID_END - CUSTOMER_ID_START + 1;  // 100
+export const CUSTOMER_ID_END = 11000;
+export const CUSTOMER_COUNT = CUSTOMER_ID_END - CUSTOMER_ID_START + 1;  // 1000
 
 export const OWNER_ID_START = 20001;
-export const OWNER_ID_END = 20050;
-export const OWNER_COUNT = OWNER_ID_END - OWNER_ID_START + 1;  // 50
+export const OWNER_ID_END = 20100;
+export const OWNER_COUNT = OWNER_ID_END - OWNER_ID_START + 1;  // 100
 
 export const STORE_ID_START = 30001;
-export const STORE_ID_END = 30100;
-export const STORE_COUNT = STORE_ID_END - STORE_ID_START + 1;  // 100
+export const STORE_ID_END = 30200;
+export const STORE_COUNT = STORE_ID_END - STORE_ID_START + 1;  // 200
 
 export const WALLET_ID_START = 40001;
-export const WALLET_ID_END = 40100;
-export const WALLET_COUNT = WALLET_ID_END - WALLET_ID_START + 1;  // 100
+export const WALLET_ID_END = 41000;
+export const WALLET_COUNT = WALLET_ID_END - WALLET_ID_START + 1;  // 1000
 
 export const CATEGORY_ID_START = 50001;
-export const CATEGORY_ID_END = 50200;
-export const CATEGORY_COUNT = CATEGORY_ID_END - CATEGORY_ID_START + 1;  // 200
+export const CATEGORY_ID_END = 50400;
+export const CATEGORY_COUNT = CATEGORY_ID_END - CATEGORY_ID_START + 1;  // 400
 
 export const MENU_ID_START = 60001;
-export const MENU_ID_END = 60800;
-export const MENU_COUNT = MENU_ID_END - MENU_ID_START + 1;  // 800
+export const MENU_ID_END = 61600;
+export const MENU_COUNT = MENU_ID_END - MENU_ID_START + 1;  // 1600
+
+// Wallet Store Balances: 1000 wallets x 200 stores = 200,000 records
+// Each wallet has balance at every store (1,000,000원 initial balance)
+export const WALLET_STORE_BALANCE_COUNT = WALLET_COUNT * STORE_COUNT;  // 200,000
+export const INITIAL_BALANCE = 1000000;  // 100만원
 
 // ===== Group IDs (for group wallet tests) =====
 export const GROUP_ID_START = 1;
@@ -113,6 +120,28 @@ export function getStoreIdsByOwner(ownerId) {
 export function getRandomStoreIdByOwner(ownerId) {
   const stores = getStoreIdsByOwner(ownerId);
   return stores[Math.floor(Math.random() * stores.length)];
+}
+
+/**
+ * Get wallet ID for a specific customer
+ * Customer 10001 -> Wallet 40001, Customer 10002 -> Wallet 40002, etc.
+ * @param {string|number} customerId - Customer ID
+ * @returns {number} Wallet ID
+ */
+export function getWalletIdByCustomer(customerId) {
+  const customerIndex = Number(customerId) - CUSTOMER_ID_START;
+  return WALLET_ID_START + customerIndex;
+}
+
+/**
+ * Get random wallet-store pair for payment testing
+ * @returns {{ walletId: number, storeId: number }} Wallet and Store IDs
+ */
+export function getRandomWalletStorePair() {
+  return {
+    walletId: getRandomWalletId(),
+    storeId: getRandomStoreId()
+  };
 }
 
 // ===== VU Configuration per Scenario =====

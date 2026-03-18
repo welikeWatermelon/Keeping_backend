@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.menu.service;
 
+import com.ssafy.keeping.domain.internal.webhook.QrServiceWebhookPublisher;
 import com.ssafy.keeping.domain.menu.dto.MenuEditRequestDto;
 import com.ssafy.keeping.domain.menu.dto.MenuRequestDto;
 import com.ssafy.keeping.domain.menu.dto.MenuResponseDto;
@@ -33,6 +34,7 @@ public class MenuService {
     private final MenuCategoryRepository menuCategoryRepository;
 
     private final ImageService imageService;
+    private final QrServiceWebhookPublisher webhookPublisher;
 
     /*
     * 권한 필요 없는 메서드
@@ -98,6 +100,10 @@ public class MenuService {
                             .imgUrl(imgUrl)
                             .build()
                     );
+
+        // QR Service 캐시 갱신 Push (비동기)
+        webhookPublisher.publishMenuUpdate(saved);
+
         return new MenuResponseDto(
                 saved.getMenuId(),
                 saved.getStore().getStoreId(), saved.getMenuName(), saved.getCategory().getCategoryId(),
@@ -136,6 +142,9 @@ public class MenuService {
 
         menu.editMenu(name, imgUrl, price, desc, order);
 
+        // QR Service 캐시 갱신 Push (비동기)
+        webhookPublisher.publishMenuUpdate(menu);
+
         return new MenuResponseDto(
                 menu.getMenuId(), storeId, menu.getMenuName(),
                 menu.getCategory().getCategoryId(), menu.getCategory().getCategoryName(),
@@ -154,6 +163,9 @@ public class MenuService {
         Menu menu = validMenu(menusId, storeId);
 
         menuRepository.deleteById(menusId);
+
+        // QR Service 캐시 삭제 Push (비동기)
+        webhookPublisher.publishMenuDelete(menusId);
     }
 
     public void deleteAllMenu(Long ownerId, Long storeId) {

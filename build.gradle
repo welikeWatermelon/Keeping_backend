@@ -2,6 +2,8 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.5'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.springframework.cloud.contract' version '4.1.4'
+	id 'maven-publish'
 }
 
 group = 'com.ssafy'
@@ -24,6 +26,14 @@ repositories {
 	mavenCentral()
 }
 
+// Spring Cloud 버전 관리
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.cloud:spring-cloud-dependencies:2024.0.0"
+	}
+}
+
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -33,6 +43,10 @@ dependencies {
 	implementation 'com.github.f4b6a3:uuid-creator:5.3.6'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+	// Spring Retry (Webhook 재시도 등)
+	implementation 'org.springframework.retry:spring-retry'
+	implementation 'org.springframework:spring-aspects'
 
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
@@ -62,6 +76,9 @@ dependencies {
 
 	testImplementation 'com.h2database:h2:2.2.224'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	// Contract Testing
+	testImplementation 'org.springframework.cloud:spring-cloud-starter-contract-verifier'
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
@@ -69,9 +86,14 @@ dependencies {
 	testImplementation "org.testcontainers:mysql:1.20.4"
 	testImplementation "org.springframework.boot:spring-boot-testcontainers"
 
+
 	// 프로메테우스 구현체 추가
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'io.micrometer:micrometer-registry-prometheus'
+
+	// Micrometer Tracing (분산 추적)
+	implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+	implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
 
 }
 
@@ -86,4 +108,23 @@ tasks.named('test') {
 
 jar {
 	enabled = false
+}
+
+// Contract Testing 설정
+contracts {
+	contractsDslDir = file("src/test/resources/contracts")
+	baseClassForTests = "com.ssafy.keeping.contract.BaseContractTest"
+	testFramework = "JUNIT5"
+}
+
+// Stub JAR를 로컬 Maven에 배포 (서버 필요 없음!)
+publishing {
+	publications {
+		stubs(MavenPublication) {
+			artifact verifierStubsJar
+			groupId = 'com.ssafy'
+			artifactId = 'keeping-monolith'
+			version = '0.0.1-SNAPSHOT'
+		}
+	}
 }

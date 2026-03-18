@@ -1,5 +1,6 @@
 package com.ssafy.keeping.domain.store.service;
 
+import com.ssafy.keeping.domain.internal.webhook.QrServiceWebhookPublisher;
 import com.ssafy.keeping.domain.store.constant.StoreStatus;
 import com.ssafy.keeping.domain.store.dto.StoreEditRequestDto;
 import com.ssafy.keeping.domain.store.dto.StorePublicDto;
@@ -30,6 +31,7 @@ public class StoreService {
     private final OwnerRepository ownerRepository;
     private final WalletStoreBalanceRepository balanceRepository;
     private final ImageService imageService;
+    private final QrServiceWebhookPublisher webhookPublisher;
 
     /**
      * 가게 생성 (간소화 버전 - 외부 API merchantId 생성 제거)
@@ -68,6 +70,9 @@ public class StoreService {
         log.info("가게 등록 완료 - storeId: {}, storeName: {}, ownerId: {}",
                 store.getStoreId(), store.getStoreName(), ownerId);
 
+        // QR Service 캐시 갱신 Push (비동기)
+        webhookPublisher.publishStoreUpdate(store);
+
         return StoreResponseDto.fromEntity(store);
     }
 
@@ -97,9 +102,12 @@ public class StoreService {
 
         store.patchStore(requestDto, editImgUrl);
 
-        return StoreResponseDto.fromEntity(
-                storeRepository.save(store)
-        );
+        Store saved = storeRepository.save(store);
+
+        // QR Service 캐시 갱신 Push (비동기)
+        webhookPublisher.publishStoreUpdate(saved);
+
+        return StoreResponseDto.fromEntity(saved);
     }
 
     @Transactional
@@ -116,9 +124,12 @@ public class StoreService {
         StoreStatus status = hasPositive ? StoreStatus.SUSPENDED : StoreStatus.DELETED;
         store.deleteStore(status);
 
-        return StoreResponseDto.fromEntity(
-                storeRepository.save(store)
-        );
+        Store saved = storeRepository.save(store);
+
+        // QR Service 캐시 삭제 Push (비동기)
+        webhookPublisher.publishStoreDelete(storeId);
+
+        return StoreResponseDto.fromEntity(saved);
     }
 
     /**

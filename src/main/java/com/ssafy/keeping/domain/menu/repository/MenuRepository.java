@@ -72,4 +72,12 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
                                   @Param("name") String name);
 
     int deleteAllByStore_StoreId(Long storeId);
+
+    /** 전체 활성 메뉴 조회 (Cache Warming용) */
+    @Query("""
+    select m from Menu m
+    where m.active = true
+      and m.deletedAt is null
+    """)
+    List<Menu> findAllActiveMenus();
 }

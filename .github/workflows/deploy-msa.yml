@@ -1,0 +1,104 @@
+name: Deploy MSA to EC2
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:  # 수동 실행 가능
+
+env:
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+
+jobs:
+  # ===================================
+  # 1. Monolith 빌드 & 배포
+  # ===================================
+  deploy-monolith:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build Monolith
+      run: ./gradlew clean build -x test -x contractTest
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and Push Monolith Docker Image
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/keeping-monolith:latest .
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/keeping-monolith:${{ github.sha }} .
+        docker push ${{ secrets.DOCKER_USERNAME }}/keeping-monolith:latest
+        docker push ${{ secrets.DOCKER_USERNAME }}/keeping-monolith:${{ github.sha }}
+
+    - name: Deploy to EC2 (Monolith)
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST_MAIN }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          cd ~/keeping
+          docker-compose pull monolith
+          docker-compose up -d monolith
+          docker image prune -f
+
+  # ===================================
+  # 2. QR Service 빌드 & 배포
+  # ===================================
+  deploy-qr-service:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build QR Service
+      run: ./gradlew :services:qr-service:build -x test
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and Push QR Service Docker Image
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/keeping-qr-service:latest ./services/qr-service
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/keeping-qr-service:${{ github.sha }} ./services/qr-service
+        docker push ${{ secrets.DOCKER_USERNAME }}/keeping-qr-service:latest
+        docker push ${{ secrets.DOCKER_USERNAME }}/keeping-qr-service:${{ github.sha }}
+
+    - name: Deploy to EC2 (QR Service)
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST_QR }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          cd ~/keeping
+          docker-compose pull qr-service
+          docker-compose up -d qr-service
+          docker image prune -f

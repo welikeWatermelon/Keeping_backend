@@ -12,7 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,6 +31,7 @@ public class PaymentRecoveryService {
 
     private final PaymentIntentRepository paymentIntentRepository;
     private final WalletClient walletClient;
+    private final TransactionTemplate transactionTemplate;
 
     /** 복구 대상 존재 플래그 */
     private final AtomicBoolean hasRecoveryTarget = new AtomicBoolean(false);
@@ -113,30 +114,44 @@ public class PaymentRecoveryService {
     }
 
     /**
-     * 개별 결제 복구 로직
-     * 1. 멱등성 키로 실제 결제 여부 확인
-     * 2. 결제가 존재하면 환불 처리
-     * 3. 결제가 없으면 ROLLED_BACK으로 마킹 (추가 작업 불필요)
+     * 개별 결제 복구 로직 (트랜잭션 분리)
+     *
+     * 핵심 변경: @Transactional 제거 → 외부 API 호출과 DB 저장 분리
+     * - Phase 1: 외부 API 호출 (트랜잭션 없음, DB 커넥션 미점유)
+     * - Phase 2: DB 저장 (짧은 트랜잭션)
+     *
+     * 이점:
+     * - DB 커넥션 고갈 방지 (외부 API 대기 중 커넥션 점유 X)
+     * - 복구용 RestTemplate 사용 (10초 타임아웃, 재시도 3회)
      */
-    @Transactional
     public void recoverSinglePayment(PaymentIntent intent) {
+        Long intentId = intent.getIntentId();
         String idempotencyKey = generateIdempotencyKey(intent);
-        LocalDateTime now = LocalDateTime.now();
 
-        log.info("결제 복구 시작: intentId={}, idempotencyKey={}", intent.getIntentId(), idempotencyKey);
+        log.info("결제 복구 시작: intentId={}, idempotencyKey={}", intentId, idempotencyKey);
 
-        // 1. 실제 결제 여부 확인
-        PaymentCheckResponse checkResult = walletClient.checkPayment(idempotencyKey);
+        // Phase 1: 외부 API 호출 (트랜잭션 없음)
+        RecoveryResult result = performExternalRecovery(intent, idempotencyKey);
+
+        // Phase 2: DB 저장 (짧은 트랜잭션)
+        persistRecoveryResult(intentId, result);
+    }
+
+    /**
+     * 외부 API 호출 수행 (트랜잭션 없음)
+     * - recoveryRestTemplate 사용 (10초 타임아웃)
+     * - 재시도 3회 허용
+     */
+    private RecoveryResult performExternalRecovery(PaymentIntent intent, String idempotencyKey) {
+        // 1. 실제 결제 여부 확인 (복구용 메서드 사용)
+        PaymentCheckResponse checkResult = walletClient.checkPaymentForRecovery(idempotencyKey);
 
         if (checkResult == null || !checkResult.isExists()) {
-            // 결제가 실제로 일어나지 않음 - 별도 환불 불필요
-            intent.markRolledBack(now, "결제 미발생 확인 - 복구 완료");
-            paymentIntentRepository.save(intent);
             log.info("결제 미발생 확인: intentId={}", intent.getIntentId());
-            return;
+            return RecoveryResult.noPaymentFound("결제 미발생 확인 - 복구 완료");
         }
 
-        // 2. 결제가 존재하면 환불 처리
+        // 2. 결제가 존재하면 환불 처리 (복구용 메서드 사용)
         String refundIdempotencyKey = generateRefundIdempotencyKey(intent);
 
         RefundRequest refundRequest = RefundRequest.builder()
@@ -147,16 +162,67 @@ public class PaymentRecoveryService {
                 .reason("UNCERTAIN 상태 자동 복구")
                 .build();
 
-        RefundResponse refundResult = walletClient.refund(refundRequest, refundIdempotencyKey);
+        RefundResponse refundResult = walletClient.refundForRecovery(refundRequest, refundIdempotencyKey);
 
         if (refundResult != null && refundResult.isSuccess()) {
-            intent.markRolledBack(now, "환불 완료 - txId: " + refundResult.getRefundTransactionId());
-            paymentIntentRepository.save(intent);
             log.info("결제 환불 완료: intentId={}, refundTxId={}",
                     intent.getIntentId(), refundResult.getRefundTransactionId());
+            return RecoveryResult.refundSuccess("환불 완료 - txId: " + refundResult.getRefundTransactionId());
         } else {
             log.error("환불 실패: intentId={}, response={}", intent.getIntentId(), refundResult);
-            throw new RuntimeException("환불 처리 실패");
+            return RecoveryResult.refundFailed("환불 실패");
+        }
+    }
+
+    /**
+     * 복구 결과 DB 저장 (짧은 트랜잭션)
+     * - transactionTemplate 사용으로 명시적 트랜잭션 경계
+     * - 동시성 보호: 이미 처리된 경우 스킵
+     */
+    private void persistRecoveryResult(Long intentId, RecoveryResult result) {
+        transactionTemplate.executeWithoutResult(status -> {
+            PaymentIntent fresh = paymentIntentRepository.findById(intentId)
+                    .orElseThrow(() -> new RuntimeException("PaymentIntent not found: " + intentId));
+
+            // 동시성 보호: 이미 처리된 경우 스킵
+            if (fresh.getStatus() != PaymentStatus.UNCERTAIN) {
+                log.info("이미 처리됨 - 스킵: intentId={}, status={}", intentId, fresh.getStatus());
+                return;
+            }
+
+            if (result.isSuccess()) {
+                fresh.markRolledBack(LocalDateTime.now(), result.getNote());
+                paymentIntentRepository.save(fresh);
+                log.info("복구 결과 저장 완료: intentId={}", intentId);
+            } else {
+                // 실패 시 RuntimeException → 재시도 필요
+                throw new RuntimeException("복구 실패 - 재시도 필요: " + result.getNote());
+            }
+        });
+    }
+
+    /**
+     * 복구 결과 DTO
+     */
+    private record RecoveryResult(boolean success, String note) {
+        static RecoveryResult noPaymentFound(String note) {
+            return new RecoveryResult(true, note);
+        }
+
+        static RecoveryResult refundSuccess(String note) {
+            return new RecoveryResult(true, note);
+        }
+
+        static RecoveryResult refundFailed(String note) {
+            return new RecoveryResult(false, note);
+        }
+
+        boolean isSuccess() {
+            return success;
+        }
+
+        String getNote() {
+            return note;
         }
     }
 

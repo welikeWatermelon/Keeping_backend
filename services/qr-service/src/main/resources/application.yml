@@ -85,10 +85,18 @@ loadtest:
   backdoor:
     enabled: ${LOADTEST_BACKDOOR_ENABLED:false}
 
-# RestTemplate 타임아웃 (물리 서버 분리 대비)
+# RestTemplate 타임아웃 (용도별 분리)
 rest-template:
-  connect-timeout: 10000  # 10초 (기존 5초)
-  read-timeout: 30000     # 30초 (기존 5초)
+  connect-timeout: 3000   # 3초 (기존 10초)
+  read-timeout: 5000      # 5초 (기존 30초)
+
+rest-template-write:
+  connect-timeout: 2000   # 2초
+  read-timeout: 3000      # 3초 (Fail-Fast)
+
+rest-template-recovery:
+  connect-timeout: 5000   # 5초
+  read-timeout: 10000     # 10초 (복구는 여유있게)
 
 # Resilience4j 설정
 resilience4j:
@@ -105,15 +113,22 @@ resilience4j:
         slidingWindowSize: 5
         minimumNumberOfCalls: 3
         failureRateThreshold: 40
-        waitDurationInOpenState: 60s
+        waitDurationInOpenState: 30s  # 기존 60s → 30s
       lenient:  # NotificationClient용 (관대)
         slidingWindowSize: 20
         minimumNumberOfCalls: 10
         failureRateThreshold: 70
         waitDurationInOpenState: 15s
+      recovery:  # 복구용 (여유있는 설정)
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 60
+        waitDurationInOpenState: 15s
     instances:
       walletClient:
         baseConfig: strict
+      walletClientRecovery:
+        baseConfig: recovery
       customerClient:
         baseConfig: default
       storeClient:
@@ -128,17 +143,22 @@ resilience4j:
       default:
         maxAttempts: 3
         waitDuration: 500ms
-      strict:  # WalletClient 쓰기용 (최소 재시도)
-        maxAttempts: 2
-        waitDuration: 1000ms
+      strict:  # WalletClient 쓰기용 (재시도 없음 - Fail-Fast)
+        maxAttempts: 1
+        waitDuration: 0ms
       lenient:  # NotificationClient용
         maxAttempts: 2
         waitDuration: 200ms
+      recovery:  # 복구용 (재시도 허용)
+        maxAttempts: 3
+        waitDuration: 2000ms
     instances:
       walletClient:
         baseConfig: strict
       walletClientReadOnly:
         baseConfig: default
+      walletClientRecovery:
+        baseConfig: recovery
       customerClient:
         baseConfig: default
       storeClient:

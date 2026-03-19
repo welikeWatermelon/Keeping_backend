@@ -60,6 +60,7 @@ dependencies {
 
     // Actuator (헬스체크)
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 
     // Resilience4j (Circuit Breaker + Retry)
     implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
